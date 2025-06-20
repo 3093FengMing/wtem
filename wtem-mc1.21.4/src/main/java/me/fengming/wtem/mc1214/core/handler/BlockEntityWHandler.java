@@ -23,12 +23,6 @@ public class BlockEntityWHandler extends AbstractWHandler<CompoundTag> {
         tag.getList(path, Tag.TAG_COMPOUND).accept(new ItemTagVisitor());
     };
 
-    private static final Function<String, SimpleTagVisitor> SPAWNER_VISITOR = (path) -> (tag) -> {
-        if (!tag.contains(path)) return;
-        Utils.handleString(tag, "CustomName");
-        tag.getList(path, Tag.TAG_COMPOUND).accept(new ItemTagVisitor());
-    };
-
     @Override
     public boolean handle(CompoundTag compound) {
         String id = compound.getString("id").split(":", 2)[1];
@@ -56,31 +50,22 @@ public class BlockEntityWHandler extends AbstractWHandler<CompoundTag> {
             case "beehive", "bee_nest" -> (SimpleTagVisitor) tag -> {
                 ListTag bees = tag.getList("bees", Tag.TAG_COMPOUND);
                 for (int i = 0; i < bees.size(); ++i) {
-                    bees.getCompound(i)
-                            .getCompound("entity_data")
-                            .getCompound("entity")
-                            .accept(new EntityTagVisitor());
+                    Utils.getCompound(bees.getCompound(i), "entity_data.entity").accept(new EntityTagVisitor());
                 }
             };
             case "mob_spawner" -> (SimpleTagVisitor) tag -> {
                 tag.getCompound("SpawnData").getCompound("entity").accept(new EntityTagVisitor());
                 ListTag potentials = tag.getList("SpawnPotentials", Tag.TAG_COMPOUND);
                 for (int i = 0; i < potentials.size(); ++i) {
-                    potentials.getCompound(i)
-                            .getCompound("data")
-                            .getCompound("entity")
-                            .accept(new EntityTagVisitor());
+                    Utils.getCompound(potentials.getCompound(i), "data.entity").accept(new EntityTagVisitor());
                 }
             };
             case "trial_spawner" -> (SimpleTagVisitor) tag -> {
-                tag.getCompound("spawn_data").getCompound("entity").accept(new EntityTagVisitor());
+                Utils.getCompound(tag, "spawn_data.entity").accept(new EntityTagVisitor());
                 for (String s : List.of("normal_config", "ominous_config")) {
                     ListTag potentials = tag.getCompound(s).getList("spawn_potentials", Tag.TAG_COMPOUND);
                     for (int i = 0; i < potentials.size(); ++i) {
-                        potentials.getCompound(i)
-                                .getCompound("data")
-                                .getCompound("entity")
-                                .accept(new EntityTagVisitor());
+                        Utils.getCompound(potentials.getCompound(i), "data.entity").accept(new EntityTagVisitor());
                     }
                 }
             };

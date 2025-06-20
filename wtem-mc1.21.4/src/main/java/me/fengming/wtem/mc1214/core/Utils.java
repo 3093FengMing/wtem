@@ -3,6 +3,7 @@ package me.fengming.wtem.mc1214.core;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
+import net.minecraft.nbt.TagVisitor;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.contents.PlainTextContents;
@@ -41,5 +42,15 @@ public class Utils {
             compound = compound.getCompound(path);
         }
         compound.putString(path, literal2Translatable(compound.getString(path)));
+    }
+
+    public static CompoundTag getCompound(CompoundTag compound, String path) {
+        String[] paths = path.split("\\.");
+        for (String s : paths) {
+            path = s;
+            if (!compound.contains(path) || compound.getTagType(path) == Tag.TAG_STRING) break;
+            compound = compound.getCompound(path);
+        }
+        return compound.getCompound(path);
     }
 }
