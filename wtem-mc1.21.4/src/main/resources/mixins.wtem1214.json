@@ -1,11 +1,12 @@
 {
   "required": true,
   "compatibilityLevel": "JAVA_8",
-  "package": "me.fengming.wtem.common.mixin",
+  "package": "me.fengming.wtem.mc1214.mixin",
   "mixins": [
+    "MixinWorldUpgrader"
   ],
   "client": [
-    "MixinSelectWorldScreen"
+    "MixinEditWorldScreen"
   ],
   "injectors": {
     "defaultRequire": 0

@@ -7,3 +7,5 @@ pluginManagement {
         gradlePluginPortal()
     }
 }
+include 'wtem-mc1.21.4'
+

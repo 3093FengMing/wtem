@@ -1,29 +1,27 @@
 {
   "schemaVersion": 1,
-  "id": "wtem",
+  "id": "wtem-mc1214",
   "version": "${version}",
-  "name": "wtem",
+  "name": "WTEM for 1.21.4",
   "description": "",
   "authors": [],
   "contact": {},
   "license": "GPL-3.0",
   "icon": "assets/wtem/icon.png",
   "environment": "*",
+  "accessWidener": "wtem-1.21.4.accesswidener",
   "entrypoints": {
     "main": [
-      "me.fengming.wtem.common.Wtem"
+      "me.fengming.wtem.mc1214.Wtem"
+    ],
+    "client": [
+      "me.fengming.wtem.mc1214.WtemClient"
     ]
   },
+  "mixins": [
+    "mixins.wtem1214.json"
+  ],
   "depends": {
-    "minecraft": [
-      "1.18.2",
-      "1.19.4",
-      "1.20",
-      "1.20.1",
-      "1.20.3",
-      "1.20.5",
-      "1.20.6",
-      "1.21.5"
-    ]
+    "minecraft": "1.21.4"
   }
 }

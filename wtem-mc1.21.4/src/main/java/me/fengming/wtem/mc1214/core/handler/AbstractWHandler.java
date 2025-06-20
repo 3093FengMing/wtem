@@ -1,22 +1,14 @@
-package me.fengming.wtem.mc1214.core.extractor;
+package me.fengming.wtem.mc1214.core.handler;
 
-import net.minecraft.core.RegistryAccess;
-import net.minecraft.nbt.StringTag;
 import net.minecraft.nbt.Tag;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.network.chat.contents.PlainTextContents;
 
+/**
+ * @author FengMing
+ */
 public abstract class AbstractWHandler<T extends Tag> {
-    public static String literalToTranslatable(String literal) {
-        MutableComponent component = Component.Serializer.fromJsonLenient(literal, RegistryAccess.EMPTY);
-        if (component == null || component.getContents().type() != PlainTextContents.TYPE) return literal;
-
-        PlainTextContents plain = (PlainTextContents) component.getContents();
-        String translatable = Component.Serializer.toJson(Component.translatable(plain.text()), RegistryAccess.EMPTY);
-
-        return StringTag.quoteAndEscape(translatable);
-    }
-
-    public abstract void handle(T tag);
+    /**
+     * @param tag a tag to handle.
+     * @return true is the tag has been changed; otherwise, false.
+     */
+    public abstract boolean handle(T tag);
 }

@@ -1,4 +1,4 @@
-package me.fengming.wtem;
+package me.fengming.wtem.common;
 
 import net.fabricmc.api.ModInitializer;
 

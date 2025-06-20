@@ -1,19 +1,15 @@
-plugins {
-    id 'java'
-}
-
-group = 'me.fengming'
-version = '1.0'
-
-repositories {
-    mavenCentral()
-}
-
 dependencies {
-    testImplementation platform('org.junit:junit-bom:5.10.0')
-    testImplementation 'org.junit.jupiter:junit-jupiter'
+    minecraft("com.mojang:minecraft:1.21.4")
+    mappings(loom.layered {
+        officialMojangMappings()
+        parchment("org.parchmentmc.data:parchment-1.21.4:2025.03.23@zip")
+    })
 }
 
-test {
-    useJUnitPlatform()
+loom {
+    accessWidenerPath = file("src/main/resources/wtem-1.21.4.accesswidener")
+}
+
+tasks.compileJava {
+    options.release.set(21)
 }

@@ -1,0 +1,7 @@
+{
+  "gui.wtem.translate": "Translate",
+  "gui.wtem.main.warn": "Warning!",
+  "gui.wtem.main.extraction.working": "Extracting...",
+  "gui.wtem.main.extraction.finished": "Finished extracting",
+  "gui.wtem.main.title": "World Translation Extractor"
+}

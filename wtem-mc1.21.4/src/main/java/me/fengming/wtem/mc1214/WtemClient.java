@@ -1,14 +1,12 @@
 package me.fengming.wtem.mc1214;
 
-import me.fengming.wtem.common.core.WorldExtractor;
-import net.fabricmc.api.ModInitializer;
+import net.fabricmc.api.ClientModInitializer;
 
-public class Wtem implements ModInitializer {
-
-    public static final WorldExtractor extractor;
-
+/**
+ * @author FengMing
+ */
+public class WtemClient implements ClientModInitializer {
     @Override
-    public void onInitialize() {
-
+    public void onInitializeClient() {
     }
 }

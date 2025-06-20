@@ -1,66 +1,48 @@
 package me.fengming.wtem.mc1214.mixin;
 
-import com.llamalad7.mixinextras.sugar.Local;
+import it.unimi.dsi.fastutil.booleans.BooleanConsumer;
 import me.fengming.wtem.mc1214.gui.WtemScreen;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.screens.ConfirmScreen;
+import net.minecraft.client.gui.layouts.LinearLayout;
+import net.minecraft.client.gui.screens.BackupConfirmScreen;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.gui.screens.worldselection.SelectWorldScreen;
-import net.minecraft.client.gui.screens.worldselection.WorldSelectionList;
+import net.minecraft.client.gui.screens.worldselection.EditWorldScreen;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.contents.TranslatableContents;
-import net.minecraft.world.level.storage.LevelSummary;
+import net.minecraft.world.level.storage.LevelStorageSource;
+import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import org.spongepowered.asm.mixin.injection.callback.LocalCapture;
 
-@Mixin(SelectWorldScreen.class)
-public class MixinSelectWorldScreen extends Screen {
-    @Shadow private WorldSelectionList list;
+import static net.minecraft.client.gui.screens.worldselection.EditWorldScreen.makeBackupAndShowToast;
 
-    @Unique private Button translateButton;
+/**
+ * @author FengMing
+ */
+@Mixin(EditWorldScreen.class)
+public class MixinEditWorldScreen extends Screen {
+    @Shadow @Final private LinearLayout layout;
+    @Shadow @Final private LevelStorageSource.LevelStorageAccess levelAccess;
+    @Shadow @Final private BooleanConsumer callback;
 
-    protected MixinSelectWorldScreen(Component component) {
+    @Unique private static final Component WTEM_TRANSLATE = Component.translatable("gui.wtem.translate");
+    @Unique private static final Component WTEM_MAIN_WARN = Component.translatable("gui.wtem.main.warn");
+
+    protected MixinEditWorldScreen(Component component) {
         super(component);
     }
 
-    @Inject(method = "init", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/screens/worldselection/SelectWorldScreen;updateButtonStatus(Lnet/minecraft/world/level/storage/LevelSummary;)V"))
+    @Inject(method = "<init>", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/layouts/LinearLayout;visitWidgets(Ljava/util/function/Consumer;)V", shift = At.Shift.BEFORE))
     private void onInit(CallbackInfo ci) {
-        this.translateButton = addRenderableWidget(Button.builder(
-                Component.translatable("gui.wtem.translate"), button -> this.list.getSelectedOpt().ifPresent(this::wtem$openWtemScreen))
-                .bounds(this.width / 2 - 234, this.height - 28, 72, 20)
-                .build());
-    }
-
-    @Inject(method = "updateButtonStatus", at = @At("TAIL"))
-    private void onUpdateButtonStatus(CallbackInfo ci, @Local(argsOnly = true) LevelSummary levelSummary) {
-        if (levelSummary == null) {
-            this.translateButton.active = false;
-        } else {
-            this.translateButton.active = levelSummary.canEdit();
-        }
-    }
-
-    @Unique
-    private void wtem$openWtemScreen(WorldSelectionList.WorldListEntry worldListEntry) {
-        String levelId = ((LevelSummaryAccessor) ((WorldListEntryAccessor) (Object) worldListEntry).getSummary()) .getLevelId();
-        this.minecraft.setScreen(
-                new ConfirmScreen(b -> {
-                    if (b) {
-                        this.minecraft.setScreen(new WtemScreen(levelId, Component.translatable("gui.wtem.main.title")));
-                    } else {
-                        this.minecraft.setScreen(this);
-                    }
-                }, Component.translatable("gui.wtem.main.warn"),
-                        Component.translatable("gui.wtem.main.warn"),
-                        CommonComponents.GUI_CONTINUE,
-                        CommonComponents.GUI_CANCEL)
-        );
+        this.layout.addChild(Button.builder(
+                WTEM_TRANSLATE, button -> minecraft.setScreen(new BackupConfirmScreen(() -> minecraft.setScreen(this), (isConfirm, isCancel) -> {
+                    if (isConfirm) makeBackupAndShowToast(levelAccess);
+                    minecraft.setScreen(WtemScreen.create(minecraft, this.callback, minecraft.getFixerUpper(), levelAccess));
+                }, WTEM_MAIN_WARN, WTEM_MAIN_WARN, CommonComponents.GUI_CONTINUE, false)))
+                .width(200).build());
     }
 }

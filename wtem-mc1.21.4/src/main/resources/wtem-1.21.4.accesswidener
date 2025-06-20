@@ -1,2 +1,6 @@
 accessWidener v2 named
-accessible class net/minecraft/util/worldupdate/WorldUpgrader$AbstractUpgrader
+extendable method net/minecraft/util/worldupdate/WorldUpgrader work ()V
+extendable class net/minecraft/util/worldupdate/WorldUpgrader$AbstractUpgrader
+extendable class net/minecraft/util/worldupdate/WorldUpgrader$SimpleRegionStorageUpgrader
+extendable method net/minecraft/util/worldupdate/WorldUpgrader$AbstractUpgrader <init> (Lnet/minecraft/util/worldupdate/WorldUpgrader;Lnet/minecraft/util/datafix/DataFixTypes;Ljava/lang/String;Ljava/lang/String;Lnet/minecraft/network/chat/Component;Lnet/minecraft/network/chat/Component;)V
+extendable method net/minecraft/util/worldupdate/WorldUpgrader$SimpleRegionStorageUpgrader <init> (Lnet/minecraft/util/worldupdate/WorldUpgrader;Lnet/minecraft/util/datafix/DataFixTypes;Ljava/lang/String;Lnet/minecraft/network/chat/Component;Lnet/minecraft/network/chat/Component;)V
