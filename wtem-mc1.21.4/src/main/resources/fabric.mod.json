@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "id": "wtem",
+  "version": "${version}",
+  "name": "wtem",
+  "description": "",
+  "authors": [],
+  "contact": {},
+  "license": "GPL-3.0",
+  "icon": "assets/wtem/icon.png",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "me.fengming.wtem.common.Wtem"
+    ]
+  },
+  "depends": {
+    "minecraft": [
+      "1.18.2",
+      "1.19.4",
+      "1.20",
+      "1.20.1",
+      "1.20.3",
+      "1.20.5",
+      "1.20.6",
+      "1.21.5"
+    ]
+  }
+}
