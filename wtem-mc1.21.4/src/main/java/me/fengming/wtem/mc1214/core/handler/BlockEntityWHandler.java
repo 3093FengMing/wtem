@@ -31,6 +31,7 @@ public class BlockEntityWHandler extends AbstractWHandler<CompoundTag> {
     }
 
     private TagVisitor getVisitor(String id) {
+        EntityTagVisitor entityVisitor = new EntityTagVisitor();
         return switch (id) {
             case "barrel", "blast_furnace", "brewing_stand",
                  "campfire", "chest", "chiseled_bookshelf",
@@ -50,22 +51,22 @@ public class BlockEntityWHandler extends AbstractWHandler<CompoundTag> {
             case "beehive", "bee_nest" -> (SimpleTagVisitor) tag -> {
                 ListTag bees = tag.getList("bees", Tag.TAG_COMPOUND);
                 for (int i = 0; i < bees.size(); ++i) {
-                    Utils.getCompound(bees.getCompound(i), "entity_data.entity").accept(new EntityTagVisitor());
+                    Utils.getCompound(bees.getCompound(i), "entity_data.entity").accept(entityVisitor);
                 }
             };
             case "mob_spawner" -> (SimpleTagVisitor) tag -> {
-                tag.getCompound("SpawnData").getCompound("entity").accept(new EntityTagVisitor());
+                tag.getCompound("SpawnData").getCompound("entity").accept(entityVisitor);
                 ListTag potentials = tag.getList("SpawnPotentials", Tag.TAG_COMPOUND);
                 for (int i = 0; i < potentials.size(); ++i) {
-                    Utils.getCompound(potentials.getCompound(i), "data.entity").accept(new EntityTagVisitor());
+                    Utils.getCompound(potentials.getCompound(i), "data.entity").accept(entityVisitor);
                 }
             };
             case "trial_spawner" -> (SimpleTagVisitor) tag -> {
-                Utils.getCompound(tag, "spawn_data.entity").accept(new EntityTagVisitor());
+                Utils.getCompound(tag, "spawn_data.entity").accept(entityVisitor);
                 for (String s : List.of("normal_config", "ominous_config")) {
                     ListTag potentials = tag.getCompound(s).getList("spawn_potentials", Tag.TAG_COMPOUND);
                     for (int i = 0; i < potentials.size(); ++i) {
-                        Utils.getCompound(potentials.getCompound(i), "data.entity").accept(new EntityTagVisitor());
+                        Utils.getCompound(potentials.getCompound(i), "data.entity").accept(entityVisitor);
                     }
                 }
             };
