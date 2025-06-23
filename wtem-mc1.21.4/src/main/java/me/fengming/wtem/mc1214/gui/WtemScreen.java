@@ -21,7 +21,6 @@ import net.minecraft.server.packs.repository.ServerPacksSource;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.storage.LevelStorageSource;
-import net.minecraft.world.level.storage.WorldData;
 
 /**
  * @author FengMing
@@ -40,9 +39,11 @@ public class WtemScreen extends Screen {
 
             WtemScreen wtemScreen;
             try (WorldStem worldStem = worldOpenFlows.loadWorldStem(levelStorage.getDataTag(), false, packRepository)) {
+                // worldStem.dataPackResources().getAdvancements().getAllAdvancements().forEach(e -> e.value().display().get().getDescription());
+                // worldStem.dataPackResources().getFunctionLibrary().getFunctions()
                 RegistryAccess.Frozen frozen = worldStem.registries().compositeAccess();
                 levelStorage.saveDataTag(frozen, worldStem.worldData());
-                wtemScreen = new WtemScreen(mc, callback, dataFixer, worldStem.worldData(), levelStorage, frozen);
+                wtemScreen = new WtemScreen(mc, callback, dataFixer, worldStem, levelStorage, frozen);
             }
             return wtemScreen;
         } catch (Exception e) {
@@ -54,12 +55,12 @@ public class WtemScreen extends Screen {
     private WtemScreen(Minecraft mc,
                        BooleanConsumer callback,
                        DataFixer dataFixer,
-                       WorldData levelData,
+                       WorldStem worldStem,
                        LevelStorageSource.LevelStorageAccess levelStorage,
                        RegistryAccess registryAccess) {
         super(WTEM_SCREEN_TITLE);
         this.callback = callback;
-        this.worldExtractor = new WorldExtractor(mc, dataFixer, levelData, levelStorage, registryAccess);
+        this.worldExtractor = new WorldExtractor(mc, dataFixer, worldStem, levelStorage, registryAccess);
     }
 
     @Override

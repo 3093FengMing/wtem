@@ -1,18 +1,31 @@
 package me.fengming.wtem.mc1214.core;
 
+import com.mojang.brigadier.context.StringRange;
 import com.mojang.datafixers.DataFixer;
 import me.fengming.wtem.mc1214.Wtem;
 import me.fengming.wtem.mc1214.core.handler.BlockEntityWHandler;
 import me.fengming.wtem.mc1214.core.handler.EntityWHandler;
+import me.fengming.wtem.mc1214.mixin.MixinServerFunctionLibrary;
 import me.fengming.wtem.mc1214.mixin.MixinWorldUpgrader;
+import net.minecraft.advancements.AdvancementHolder;
+import net.minecraft.advancements.DisplayInfo;
 import net.minecraft.client.Minecraft;
+import net.minecraft.commands.CommandSource;
+import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
+import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.ServerAdvancementManager;
+import net.minecraft.server.ServerFunctionLibrary;
+import net.minecraft.server.WorldStem;
+import net.minecraft.server.packs.PackResources;
+import net.minecraft.server.packs.PackType;
+import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.util.datafix.DataFixTypes;
 import net.minecraft.util.worldupdate.WorldUpgrader;
 import net.minecraft.world.level.ChunkPos;
@@ -23,13 +36,18 @@ import net.minecraft.world.level.chunk.storage.RegionStorageInfo;
 import net.minecraft.world.level.chunk.storage.SimpleRegionStorage;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.level.storage.DimensionDataStorage;
+import net.minecraft.world.level.storage.LevelResource;
 import net.minecraft.world.level.storage.LevelStorageSource;
 import net.minecraft.world.level.storage.WorldData;
+import net.minecraft.world.phys.Vec2;
+import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.scores.Scoreboard;
 import net.minecraft.world.scores.ScoreboardSaveData;
 import org.jetbrains.annotations.NotNull;
 
 import java.nio.file.*;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * @author FengMing
@@ -40,30 +58,87 @@ public class WorldExtractor extends WorldUpgrader {
 
     private final Minecraft mc;
     private final DataFixer dataFixer;
-    private final WorldData worldData;
+    private final WorldStem worldStem;
     private final LevelStorageSource.LevelStorageAccess levelStorage;
     private final RegistryAccess registry;
 
     public WorldExtractor(Minecraft mc,
                           DataFixer dataFixer,
-                          WorldData worldData,
+                          WorldStem worldStem,
                           LevelStorageSource.LevelStorageAccess levelStorage,
                           RegistryAccess registry) {
         super(levelStorage, dataFixer, registry, false, false);
         this.mc = mc;
         this.dataFixer = dataFixer;
-        this.worldData = worldData;
+        this.worldStem = worldStem;
         this.levelStorage = levelStorage;
         this.registry = registry;
     }
 
     @Override
     public void work() {
+        var thiz = (MixinWorldUpgrader) this;
+        var datapack = this.worldStem.dataPackResources();
+
         new ChunkExtractor().upgrade();
         new EntityExtractor().upgrade();
-        extractBossBar(this.levelStorage, this.registry, this.worldData);
-        extractScoreBoard(((MixinWorldUpgrader) this).getOverworldDataStorage());
-        ((MixinWorldUpgrader) this).setFinished(true);
+        extractScoreBoard(thiz.getOverworldDataStorage());
+        extractBossBar(this.levelStorage, this.registry, this.worldStem.worldData());
+        extractFunctions(datapack.getFunctionLibrary(), this.worldStem.resourceManager(), this.levelStorage);
+        extractAdvancements(datapack.getAdvancements());
+        thiz.setFinished(true);
+    }
+
+    public static void extractFunctions(ServerFunctionLibrary functions, ResourceManager manager, LevelStorageSource.LevelStorageAccess levelStorage) {
+        var dispatcher = ((MixinServerFunctionLibrary) functions).getDispatcher();
+        var css = new CommandSourceStack(CommandSource.NULL, Vec3.ZERO, Vec2.ZERO, null, 3, "", CommonComponents.EMPTY, null, null);
+        Path datapackDir = levelStorage.getLevelPath(LevelResource.DATAPACK_DIR);
+
+        for (PackResources pack : manager.listPacks().toList()) {
+            String packId = pack.packId();
+            if ("vanilla".equals(packId)) continue;
+            packId = packId.split("/")[1] + "_wtem";
+            Path root = datapackDir.resolve(packId).resolve("data");
+            try (var stream = Files.newDirectoryStream(root)) {
+                for (Path namespacePath : stream) {
+                    pack.listResources(PackType.SERVER_DATA, namespacePath.getFileName().toString(), "function", (rl, supplier) -> {
+                        List<String> modified = new ArrayList<>();
+                        for (String line : Utils.readLines(supplier, rl)) {
+                            if (!line.startsWith("bossbar") && !line.startsWith("scoreboard") &&
+                                    !line.startsWith("team") && !line.startsWith("tellraw") &&
+                                    !line.startsWith("title")
+                            ) continue;
+                            StringBuilder sb = new StringBuilder();
+                            var results = dispatcher.parse(line, css);
+                            for (var arg : results.getContext().getArguments().values()) {
+                                var result = arg.getResult();
+                                if (!(result instanceof Component)) continue;
+                                // replace the original component with the translatable
+                                var translatable = Utils.literal2Translatable((Component) result);
+                                StringRange range = arg.getRange();
+                                sb.append(line, 0, range.getStart());
+                                sb.append(Utils.component2String(translatable));
+                                sb.append(line.substring(range.getEnd()));
+                                modified.add(sb.toString());
+                            }
+                        }
+                        Path filePath = root.resolve(rl.getNamespace()).resolve(rl.getPath());
+                        Utils.writeLines(filePath, String.join("\n", modified));
+                    });
+                }
+            } catch (Exception e) {
+                throw new IllegalStateException(e);
+            }
+        }
+    }
+
+    public static void extractAdvancements(ServerAdvancementManager manager) {
+        for (AdvancementHolder advancement : manager.getAllAdvancements()) {
+            DisplayInfo display = advancement.value().display().orElse(null);
+            if (display == null) continue;
+            Utils.literal2Translatable(display.getDescription());
+            Utils.literal2Translatable(display.getTitle());
+        }
     }
 
     public static void extractBossBar(LevelStorageSource.LevelStorageAccess levelStorage, RegistryAccess registry, WorldData worldData) {
@@ -106,6 +181,7 @@ public class WorldExtractor extends WorldUpgrader {
     }
 
     class ChunkExtractor extends WorldUpgrader.AbstractUpgrader<ChunkStorage> {
+        private final BlockEntityWHandler beHandler = new BlockEntityWHandler();
         ChunkExtractor() {
             super(DataFixTypes.CHUNK, "chunk", "region", STATUS_EXTRACTING, STATUS_FINISHED_EXTRACTION);
         }
@@ -140,6 +216,7 @@ public class WorldExtractor extends WorldUpgrader {
     }
 
     class EntityExtractor extends WorldUpgrader.SimpleRegionStorageUpgrader {
+        private final EntityWHandler entityHandler = new EntityWHandler();
         EntityExtractor() {
             super(DataFixTypes.ENTITY_CHUNK, "entities", STATUS_EXTRACTING, STATUS_FINISHED_EXTRACTION);
         }
