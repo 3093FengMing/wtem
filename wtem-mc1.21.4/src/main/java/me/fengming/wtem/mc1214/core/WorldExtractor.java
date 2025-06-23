@@ -1,5 +1,7 @@
 package me.fengming.wtem.mc1214.core;
 
+import com.mojang.brigadier.ParseResults;
+import com.mojang.brigadier.context.ParsedArgument;
 import com.mojang.brigadier.context.StringRange;
 import com.mojang.datafixers.DataFixer;
 import me.fengming.wtem.mc1214.Wtem;
@@ -19,6 +21,7 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.contents.PlainTextContents;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.ServerAdvancementManager;
 import net.minecraft.server.ServerFunctionLibrary;
@@ -48,6 +51,8 @@ import org.jetbrains.annotations.NotNull;
 import java.nio.file.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+import java.util.function.Function;
 
 /**
  * @author FengMing
@@ -97,32 +102,12 @@ public class WorldExtractor extends WorldUpgrader {
         for (PackResources pack : manager.listPacks().toList()) {
             String packId = pack.packId();
             if ("vanilla".equals(packId)) continue;
-            packId = packId.split("/")[1] + "_wtem";
-            Path root = datapackDir.resolve(packId).resolve("data");
-            try (var stream = Files.newDirectoryStream(root)) {
+            String oPackId = packId.split("/")[1];
+            try (var stream = Files.newDirectoryStream(datapackDir.resolve(oPackId + "/data"))) {
                 for (Path namespacePath : stream) {
                     pack.listResources(PackType.SERVER_DATA, namespacePath.getFileName().toString(), "function", (rl, supplier) -> {
-                        List<String> modified = new ArrayList<>();
-                        for (String line : Utils.readLines(supplier, rl)) {
-                            if (!line.startsWith("bossbar") && !line.startsWith("scoreboard") &&
-                                    !line.startsWith("team") && !line.startsWith("tellraw") &&
-                                    !line.startsWith("title")
-                            ) continue;
-                            StringBuilder sb = new StringBuilder();
-                            var results = dispatcher.parse(line, css);
-                            for (var arg : results.getContext().getArguments().values()) {
-                                var result = arg.getResult();
-                                if (!(result instanceof Component)) continue;
-                                // replace the original component with the translatable
-                                var translatable = Utils.literal2Translatable((Component) result);
-                                StringRange range = arg.getRange();
-                                sb.append(line, 0, range.getStart());
-                                sb.append(Utils.component2String(translatable));
-                                sb.append(line.substring(range.getEnd()));
-                                modified.add(sb.toString());
-                            }
-                        }
-                        Path filePath = root.resolve(rl.getNamespace()).resolve(rl.getPath());
+                        List<String> modified = replaceComponents(Utils.readLines(supplier, rl), line -> dispatcher.parse(line, css));
+                        Path filePath = datapackDir.resolve(oPackId + "_wtem/data/" + rl.getNamespace() + "/" + rl.getPath());
                         Utils.writeLines(filePath, String.join("\n", modified));
                     });
                 }
@@ -130,6 +115,45 @@ public class WorldExtractor extends WorldUpgrader {
                 throw new IllegalStateException(e);
             }
         }
+    }
+
+    private static List<String> replaceComponents(List<String> lines, Function<String, ParseResults<CommandSourceStack>> parser) {
+        List<String> modified = new ArrayList<>();
+        for (String line : lines) {
+            if (!lineNeedReplace(line)) continue;
+
+            var results = parser.apply(line);
+            StringBuilder sb = new StringBuilder();
+            Optional<ParsedArgument<CommandSourceStack, ?>> optional;
+            while ((optional = getComponentArg(results)).isPresent()) {
+                var arg = optional.get();
+                var translatable = Utils.literal2Translatable((Component) arg.getResult());
+                StringRange range = arg.getRange();
+                sb.append(line, 0, range.getStart())
+                        .append(Utils.component2String(translatable))
+                        .append(line.substring(range.getEnd()));
+                line = sb.toString();
+                results = parser.apply(line);
+            }
+            modified.add(line);
+        }
+        return modified;
+    }
+
+    private static Optional<ParsedArgument<CommandSourceStack, ?>> getComponentArg(ParseResults<CommandSourceStack> results) {
+        return results.getContext().getArguments().values().stream()
+                .filter(WorldExtractor::argNeedReplace)
+                .findFirst();
+    }
+
+    private static boolean argNeedReplace(ParsedArgument<?, ?> arg) {
+        return arg.getResult() instanceof Component c && c.getContents().type() == PlainTextContents.TYPE;
+    }
+
+    private static boolean lineNeedReplace(String line) {
+        return line.startsWith("bossbar") || line.startsWith("scoreboard") ||
+                line.startsWith("team") || line.startsWith("tellraw") ||
+                line.startsWith("title");
     }
 
     public static void extractAdvancements(ServerAdvancementManager manager) {
@@ -197,7 +221,6 @@ public class WorldExtractor extends WorldUpgrader {
             if (compoundTag == null || !ChunkStatus.FULL.getName().equals(compoundTag.getString("Status"))) return false;
             boolean isUpdated = false;
 
-            var beHandler = new BlockEntityWHandler();
             ListTag blockEntities = compoundTag.getList("block_entities", Tag.TAG_COMPOUND);
             Wtem.LOGGER.debug("blockEntities = {}", blockEntities);
             for (int i = 0; i < blockEntities.size(); i++) {
@@ -232,7 +255,6 @@ public class WorldExtractor extends WorldUpgrader {
             if (compoundTag == null) return false;
             boolean isUpdated = false;
 
-            var entityHandler = new EntityWHandler();
             ListTag entities = compoundTag.getList("Entities", Tag.TAG_COMPOUND);
             Wtem.LOGGER.debug("Entities = {}", entities);
             for (int i = 0; i < entities.size(); i++) {
