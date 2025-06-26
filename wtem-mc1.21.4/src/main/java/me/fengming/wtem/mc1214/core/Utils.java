@@ -1,17 +1,18 @@
 package me.fengming.wtem.mc1214.core;
 
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.mojang.serialization.JsonOps;
 import me.fengming.wtem.mc1214.Wtem;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.ComponentSerialization;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.contents.PlainTextContents;
+import net.minecraft.resources.ResourceLocation;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -50,14 +51,16 @@ public class Utils {
      */
     public static void handleString(CompoundTag compound, String path) {
         String[] paths = path.split("\\.");
+        CompoundTag element = compound;
         for (String s : paths) {
             path = s;
             if (!compound.contains(path) || compound.getTagType(path) == Tag.TAG_STRING) break;
-            compound = compound.getCompound(path);
+            element = compound.getCompound(path);
         }
-        String s = compound.getString(path);
+        String s = element.getString(path);
         if (s.isEmpty()) return;
-        compound.putString(path, literal2Translatable(s));
+        element.remove(path);
+        element.putString(path, literal2Translatable(s));
     }
 
     public static void handleJsonElement(JsonObject json, String path) {
@@ -86,18 +89,6 @@ public class Utils {
         return tag.getCompound(path);
     }
 
-    public static JsonElement getJsonElement(JsonObject json, String path) {
-        String[] paths = path.split("\\.");
-        if (paths.length == 0) return json;
-        JsonObject element = json;
-        for (String s : paths) {
-            path = s;
-            if (!json.has(path)) break;
-            element = json.getAsJsonObject(path);
-        }
-        return element.get(path);
-    }
-
     public static void writeLines(Path path, String lines) {
         try {
             if (Files.notExists(path)) {
@@ -112,9 +103,16 @@ public class Utils {
 
     public static void writeNbt(Path path, CompoundTag tag) {
         try {
-            NbtIo.write(tag, path);
+            NbtIo.writeCompressed(tag, path);
         } catch (IOException e) {
             Wtem.LOGGER.error("Failed to write nbt to {}", path, e);
         }
+    }
+
+    public static void logInfo(String key, ResourceLocation world, ListTag pos) {
+        if (pos.size() != 3) return;
+        StringBuilder sb = new StringBuilder("[");
+        sb.append(pos.getInt(0)).append(pos.getInt(1)).append(pos.getInt(2)).append("]");
+        Wtem.LOGGER.info("Key: {} {} In World {}", key, sb, world);
     }
 }

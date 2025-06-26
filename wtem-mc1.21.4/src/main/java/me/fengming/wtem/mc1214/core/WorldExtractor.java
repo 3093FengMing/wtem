@@ -13,7 +13,9 @@ import me.fengming.wtem.mc1214.core.handler.EntityWHandler;
 import me.fengming.wtem.mc1214.core.handler.StructureTemplateWHandler;
 import me.fengming.wtem.mc1214.core.misc.CustomScoreBoard;
 import me.fengming.wtem.mc1214.mixin.MixinServerFunctionLibrary;
+import me.fengming.wtem.mc1214.mixin.MixinStructureTemplateManager;
 import me.fengming.wtem.mc1214.mixin.MixinWorldUpgrader;
+import net.minecraft.FileUtil;
 import net.minecraft.client.Minecraft;
 import net.minecraft.commands.CommandSource;
 import net.minecraft.commands.CommandSourceStack;
@@ -71,6 +73,7 @@ import java.util.function.Function;
 public class WorldExtractor extends WorldUpgrader {
     public static final Gson GSON = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
     public static final FileToIdConverter STRUCTURE_CONVERTOR = new FileToIdConverter("structure", ".nbt");
+    public static final CommandSourceStack EMPTY_SOURCE = new CommandSourceStack(CommandSource.NULL, Vec3.ZERO, Vec2.ZERO, null, 3, "", CommonComponents.EMPTY, null, null);
 
     public static final Component STATUS_EXTRACTING = Component.translatable("gui.wtem.main.extraction.working");
     public static final Component STATUS_FINISHED_EXTRACTION = Component.translatable("gui.wtem.main.extraction.finished");
@@ -107,14 +110,27 @@ public class WorldExtractor extends WorldUpgrader {
         extractScoreBoard(thiz.getOverworldDataStorage());
         extractBossBar(this.levelStorage, this.registry, this.worldStem.worldData());
         extractDatapacks(datapack, this.worldStem.resourceManager(), this.levelStorage, this.structureManager);
+        extractStructures(this.structureManager);
         thiz.setFinished(true);
+    }
+
+    public static void extractStructures(StructureTemplateManager manager) {
+        var managerMixin = (MixinStructureTemplateManager) manager;
+        managerMixin.invokeListGenerated().forEach(rl -> {
+            var optional = manager.get(rl);
+            if (optional.isEmpty()) return;
+            CompoundTag modified = new StructureTemplateWHandler().handle(optional.get());
+            Path filePath = FileUtil.createPathToResource(managerMixin.getGeneratedDir().resolve(rl.getNamespace()).resolve("structures"), rl.getPath(), ".nbt");
+            Utils.writeNbt(filePath, modified);
+        });
     }
 
     public static void extractDatapacks(ReloadableServerResources datapacks,
                                         ResourceManager resourceManager,
                                         LevelStorageSource.LevelStorageAccess levelStorage,
                                         StructureTemplateManager structureManager) {
-        final Function<String, ParseResults<CommandSourceStack>> parser = line -> ((MixinServerFunctionLibrary) datapacks.getFunctionLibrary()).getDispatcher().parse(line, new CommandSourceStack(CommandSource.NULL, Vec3.ZERO, Vec2.ZERO, null, 3, "", CommonComponents.EMPTY, null, null));
+        final Function<String, ParseResults<CommandSourceStack>> parser =
+                line -> ((MixinServerFunctionLibrary) datapacks.getFunctionLibrary()).getDispatcher().parse(line, EMPTY_SOURCE);
         final var datapackDir = levelStorage.getLevelPath(LevelResource.DATAPACK_DIR);
 
         for (PackResources pack : resourceManager.listPacks().toList()) {
@@ -126,7 +142,8 @@ public class WorldExtractor extends WorldUpgrader {
                     String namespace = namespacePath.getFileName().toString();
                     Function<ResourceLocation, Path> filePath = rl -> datapackDir.resolve(oPackId + "_wtem/data/" + rl.getNamespace() + "/" + rl.getPath());
                     pack.listResources(PackType.SERVER_DATA, namespace, "structure", (rl, supplier) -> {
-                        CompoundTag modified = processStructure(rl, structureManager);
+                        StructureTemplate structure = structureManager.get(STRUCTURE_CONVERTOR.fileToId(rl)).orElse(null);
+                        CompoundTag modified = new StructureTemplateWHandler().handle(structure);
                         Utils.writeNbt(filePath.apply(rl), modified);
                     });
                     pack.listResources(PackType.SERVER_DATA, namespace, "function", (rl, supplier) -> {
@@ -217,11 +234,6 @@ public class WorldExtractor extends WorldUpgrader {
                 line.startsWith("title");
     }
 
-    public static CompoundTag processStructure(ResourceLocation rl, StructureTemplateManager manager) {
-        StructureTemplate structure = manager.get(STRUCTURE_CONVERTOR.fileToId(rl)).orElse(null);
-        return new StructureTemplateWHandler().handle(structure);
-    }
-
     public static void extractBossBar(LevelStorageSource.LevelStorageAccess levelStorage, RegistryAccess registry, WorldData worldData) {
         CompoundTag bossBarTag = worldData.getCustomBossEvents();
         if (bossBarTag == null) return;
@@ -254,11 +266,11 @@ public class WorldExtractor extends WorldUpgrader {
             boolean isUpdated = false;
 
             ListTag blockEntities = compoundTag.getList("block_entities", Tag.TAG_COMPOUND);
-            Wtem.LOGGER.debug("blockEntities = {}", blockEntities);
+            Wtem.LOGGER.info("blockEntities = {}", blockEntities);
             for (int i = 0; i < blockEntities.size(); i++) {
                 isUpdated |= beHandler.handle(blockEntities.getCompound(i));
             }
-            Wtem.LOGGER.debug("updated blockEntities = {}", blockEntities);
+            Wtem.LOGGER.info("updated blockEntities = {}", blockEntities);
 
             if (!isUpdated) return false;
 
@@ -288,11 +300,11 @@ public class WorldExtractor extends WorldUpgrader {
             boolean isUpdated = false;
 
             ListTag entities = compoundTag.getList("Entities", Tag.TAG_COMPOUND);
-            Wtem.LOGGER.debug("Entities = {}", entities);
+            Wtem.LOGGER.info("Entities = {}", entities);
             for (int i = 0; i < entities.size(); i++) {
                 isUpdated |= entityHandler.handle(entities.getCompound(i));
             }
-            Wtem.LOGGER.debug("updated Entities = {}", entities);
+            Wtem.LOGGER.info("updated Entities = {}", entities);
 
             if (!isUpdated) return false;
 

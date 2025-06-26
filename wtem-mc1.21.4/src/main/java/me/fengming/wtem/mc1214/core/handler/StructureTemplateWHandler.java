@@ -19,7 +19,7 @@ public class StructureTemplateWHandler extends AbstractWHandler<CompoundTag> {
     @Override
     public boolean handle(CompoundTag tag) {
         BlockEntityWHandler beHandler = new BlockEntityWHandler();
-        ListTag blocks = tag.getList("blocks", CompoundTag.TAG_LIST);
+        ListTag blocks = tag.getList("blocks", CompoundTag.TAG_COMPOUND);
         for (int i = 0; i < blocks.size(); i++) {
             CompoundTag block = blocks.getCompound(i);
             if (!block.contains("nbt")) continue;
