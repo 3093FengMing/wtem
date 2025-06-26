@@ -1,23 +1,21 @@
 package me.fengming.wtem.mc1214.core;
 
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.mojang.serialization.JsonOps;
 import me.fengming.wtem.mc1214.Wtem;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.ComponentSerialization;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.contents.PlainTextContents;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.server.packs.resources.IoSupplier;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.List;
 
 /**
  * @author FengMing
@@ -39,9 +37,9 @@ public class Utils {
         return translatable;
     }
 
-    public static String component2String(Component component) {
+    public static String translatable2String(Component component) {
         if (component == null) return "";
-        return Component.Serializer.toJson(component, RegistryAccess.EMPTY);
+        return Component.Serializer.toJson(literal2Translatable(component), RegistryAccess.EMPTY);
     }
 
     /**
@@ -62,23 +60,42 @@ public class Utils {
         compound.putString(path, literal2Translatable(s));
     }
 
+    public static void handleJsonElement(JsonObject json, String path) {
+        String[] paths = path.split("\\.");
+        if (paths.length == 0) return;
+        JsonObject element = json;
+        for (String s : paths) {
+            path = s;
+            if (!json.has(path)) break;
+            element = json.getAsJsonObject(path);
+        }
+        var translatable = literal2Translatable(Component.Serializer.fromJson(element.get(path), RegistryAccess.EMPTY));
+        element.remove(path);
+        element.add(path, ComponentSerialization.CODEC.encodeStart(JsonOps.INSTANCE, translatable).getOrThrow());
+    }
+
     public static CompoundTag getCompound(CompoundTag compound, String path) {
         String[] paths = path.split("\\.");
+        if (paths.length == 0) return compound;
+        CompoundTag tag = new CompoundTag();
         for (String s : paths) {
             path = s;
             if (!compound.contains(path) || compound.getTagType(path) == Tag.TAG_STRING) break;
-            compound = compound.getCompound(path);
+            tag = compound.getCompound(path);
         }
-        return compound.getCompound(path);
+        return tag.getCompound(path);
     }
 
-    public static List<String> readLines(IoSupplier<InputStream> supplier, ResourceLocation rl) {
-        try (BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(supplier.get(), StandardCharsets.UTF_8))) {
-            return bufferedReader.lines().toList();
-        } catch (IOException e) {
-            Wtem.LOGGER.error("Failed to read lines from {}", rl, e);
+    public static JsonElement getJsonElement(JsonObject json, String path) {
+        String[] paths = path.split("\\.");
+        if (paths.length == 0) return json;
+        JsonObject element = json;
+        for (String s : paths) {
+            path = s;
+            if (!json.has(path)) break;
+            element = json.getAsJsonObject(path);
         }
-        return List.of();
+        return element.get(path);
     }
 
     public static void writeLines(Path path, String lines) {
@@ -90,6 +107,14 @@ public class Utils {
             Files.writeString(path, lines);
         } catch (IOException e) {
             Wtem.LOGGER.error("Failed to write lines to {}", path, e);
+        }
+    }
+
+    public static void writeNbt(Path path, CompoundTag tag) {
+        try {
+            NbtIo.write(tag, path);
+        } catch (IOException e) {
+            Wtem.LOGGER.error("Failed to write nbt to {}", path, e);
         }
     }
 }

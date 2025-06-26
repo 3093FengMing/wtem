@@ -1,5 +1,8 @@
 package me.fengming.wtem.mc1214.core;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonParser;
 import com.mojang.brigadier.ParseResults;
 import com.mojang.brigadier.context.ParsedArgument;
 import com.mojang.brigadier.context.StringRange;
@@ -7,47 +10,55 @@ import com.mojang.datafixers.DataFixer;
 import me.fengming.wtem.mc1214.Wtem;
 import me.fengming.wtem.mc1214.core.handler.BlockEntityWHandler;
 import me.fengming.wtem.mc1214.core.handler.EntityWHandler;
+import me.fengming.wtem.mc1214.core.handler.StructureTemplateWHandler;
+import me.fengming.wtem.mc1214.core.misc.CustomScoreBoard;
 import me.fengming.wtem.mc1214.mixin.MixinServerFunctionLibrary;
 import me.fengming.wtem.mc1214.mixin.MixinWorldUpgrader;
-import net.minecraft.advancements.AdvancementHolder;
-import net.minecraft.advancements.DisplayInfo;
 import net.minecraft.client.Minecraft;
 import net.minecraft.commands.CommandSource;
 import net.minecraft.commands.CommandSourceStack;
-import net.minecraft.core.HolderLookup;
+import net.minecraft.core.HolderGetter;
 import net.minecraft.core.RegistryAccess;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.contents.PlainTextContents;
+import net.minecraft.resources.FileToIdConverter;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.server.ServerAdvancementManager;
-import net.minecraft.server.ServerFunctionLibrary;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.ReloadableServerResources;
 import net.minecraft.server.WorldStem;
 import net.minecraft.server.packs.PackResources;
 import net.minecraft.server.packs.PackType;
+import net.minecraft.server.packs.resources.IoSupplier;
 import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.util.datafix.DataFixTypes;
 import net.minecraft.util.worldupdate.WorldUpgrader;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.chunk.storage.ChunkStorage;
 import net.minecraft.world.level.chunk.storage.RegionStorageInfo;
 import net.minecraft.world.level.chunk.storage.SimpleRegionStorage;
-import net.minecraft.world.level.saveddata.SavedData;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager;
 import net.minecraft.world.level.storage.DimensionDataStorage;
 import net.minecraft.world.level.storage.LevelResource;
 import net.minecraft.world.level.storage.LevelStorageSource;
 import net.minecraft.world.level.storage.WorldData;
 import net.minecraft.world.phys.Vec2;
 import net.minecraft.world.phys.Vec3;
-import net.minecraft.world.scores.Scoreboard;
-import net.minecraft.world.scores.ScoreboardSaveData;
 import org.jetbrains.annotations.NotNull;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.ArrayList;
 import java.util.List;
@@ -58,6 +69,9 @@ import java.util.function.Function;
  * @author FengMing
  */
 public class WorldExtractor extends WorldUpgrader {
+    public static final Gson GSON = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
+    public static final FileToIdConverter STRUCTURE_CONVERTOR = new FileToIdConverter("structure", ".nbt");
+
     public static final Component STATUS_EXTRACTING = Component.translatable("gui.wtem.main.extraction.working");
     public static final Component STATUS_FINISHED_EXTRACTION = Component.translatable("gui.wtem.main.extraction.finished");
 
@@ -66,6 +80,7 @@ public class WorldExtractor extends WorldUpgrader {
     private final WorldStem worldStem;
     private final LevelStorageSource.LevelStorageAccess levelStorage;
     private final RegistryAccess registry;
+    private final StructureTemplateManager structureManager;
 
     public WorldExtractor(Minecraft mc,
                           DataFixer dataFixer,
@@ -78,6 +93,8 @@ public class WorldExtractor extends WorldUpgrader {
         this.worldStem = worldStem;
         this.levelStorage = levelStorage;
         this.registry = registry;
+        HolderGetter<Block> holderGetter = this.registry.lookupOrThrow(Registries.BLOCK).filterFeatures(this.worldStem.worldData().enabledFeatures());
+        this.structureManager = new StructureTemplateManager(this.worldStem.resourceManager(), levelStorage, dataFixer, holderGetter);
     }
 
     @Override
@@ -89,26 +106,40 @@ public class WorldExtractor extends WorldUpgrader {
         new EntityExtractor().upgrade();
         extractScoreBoard(thiz.getOverworldDataStorage());
         extractBossBar(this.levelStorage, this.registry, this.worldStem.worldData());
-        extractFunctions(datapack.getFunctionLibrary(), this.worldStem.resourceManager(), this.levelStorage);
-        extractAdvancements(datapack.getAdvancements());
+        extractDatapacks(datapack, this.worldStem.resourceManager(), this.levelStorage, this.structureManager);
         thiz.setFinished(true);
     }
 
-    public static void extractFunctions(ServerFunctionLibrary functions, ResourceManager manager, LevelStorageSource.LevelStorageAccess levelStorage) {
-        var dispatcher = ((MixinServerFunctionLibrary) functions).getDispatcher();
-        var css = new CommandSourceStack(CommandSource.NULL, Vec3.ZERO, Vec2.ZERO, null, 3, "", CommonComponents.EMPTY, null, null);
-        Path datapackDir = levelStorage.getLevelPath(LevelResource.DATAPACK_DIR);
+    public static void extractDatapacks(ReloadableServerResources datapacks,
+                                        ResourceManager resourceManager,
+                                        LevelStorageSource.LevelStorageAccess levelStorage,
+                                        StructureTemplateManager structureManager) {
+        final Function<String, ParseResults<CommandSourceStack>> parser = line -> ((MixinServerFunctionLibrary) datapacks.getFunctionLibrary()).getDispatcher().parse(line, new CommandSourceStack(CommandSource.NULL, Vec3.ZERO, Vec2.ZERO, null, 3, "", CommonComponents.EMPTY, null, null));
+        final var datapackDir = levelStorage.getLevelPath(LevelResource.DATAPACK_DIR);
 
-        for (PackResources pack : manager.listPacks().toList()) {
+        for (PackResources pack : resourceManager.listPacks().toList()) {
             String packId = pack.packId();
             if ("vanilla".equals(packId)) continue;
             String oPackId = packId.split("/")[1];
             try (var stream = Files.newDirectoryStream(datapackDir.resolve(oPackId + "/data"))) {
                 for (Path namespacePath : stream) {
-                    pack.listResources(PackType.SERVER_DATA, namespacePath.getFileName().toString(), "function", (rl, supplier) -> {
-                        List<String> modified = replaceComponents(Utils.readLines(supplier, rl), line -> dispatcher.parse(line, css));
-                        Path filePath = datapackDir.resolve(oPackId + "_wtem/data/" + rl.getNamespace() + "/" + rl.getPath());
-                        Utils.writeLines(filePath, String.join("\n", modified));
+                    String namespace = namespacePath.getFileName().toString();
+                    Function<ResourceLocation, Path> filePath = rl -> datapackDir.resolve(oPackId + "_wtem/data/" + rl.getNamespace() + "/" + rl.getPath());
+                    pack.listResources(PackType.SERVER_DATA, namespace, "structure", (rl, supplier) -> {
+                        CompoundTag modified = processStructure(rl, structureManager);
+                        Utils.writeNbt(filePath.apply(rl), modified);
+                    });
+                    pack.listResources(PackType.SERVER_DATA, namespace, "function", (rl, supplier) -> {
+                        String modified = processFunction(supplier, parser);
+                        Utils.writeLines(filePath.apply(rl), modified);
+                    });
+                    pack.listResources(PackType.SERVER_DATA, namespace, "advancement", (rl, supplier) -> {
+                        String modified = processJsonFile(supplier, List.of("display.title", "display.description"));
+                        Utils.writeLines(filePath.apply(rl), modified);
+                    });
+                    pack.listResources(PackType.SERVER_DATA, namespace, "enchantment", (rl, supplier) -> {
+                        String modified = processJsonFile(supplier, List.of("description"));
+                        Utils.writeLines(filePath.apply(rl), modified);
                     });
                 }
             } catch (Exception e) {
@@ -117,37 +148,67 @@ public class WorldExtractor extends WorldUpgrader {
         }
     }
 
-    private static List<String> replaceComponents(List<String> lines, Function<String, ParseResults<CommandSourceStack>> parser) {
+    public static String processJsonFile(IoSupplier<InputStream> supplier, List<String> list) {
+        String jsonString = "";
+        try (var br = new InputStreamReader(supplier.get(), StandardCharsets.UTF_8)) {
+            var jsonObj = JsonParser.parseReader(br).getAsJsonObject();
+            for (String s : list) {
+                Utils.handleJsonElement(jsonObj, s);
+            }
+            jsonString = GSON.toJson(jsonObj);
+        } catch (Exception e) {
+            Wtem.LOGGER.error("Failed to parse JSON", e);
+        }
+        return jsonString;
+    }
+
+    public static String processFunction(IoSupplier<InputStream> supplier, Function<String, ParseResults<CommandSourceStack>> parser) {
+        List<String> lines;
+        try (BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(supplier.get(), StandardCharsets.UTF_8))) {
+            lines = bufferedReader.lines().toList();
+        } catch (IOException e) {
+            return "";
+        }
+
         List<String> modified = new ArrayList<>();
-        for (String line : lines) {
+        for (int i = 0, size = lines.size(); i < size; i++) {
+            String line = lines.get(i).trim();
             if (!lineNeedReplace(line)) continue;
 
-            var results = parser.apply(line);
-            StringBuilder sb = new StringBuilder();
+            String finalLine;
+            if (line.endsWith("\\")) {
+                StringBuilder sb1 = new StringBuilder(line);
+                do {
+                    if (++i >= size) throw new IllegalArgumentException("Line continuation at end of file");
+                    sb1.deleteCharAt(sb1.length() - 1);
+                    sb1.append(lines.get(i).trim());
+                } while (sb1.toString().endsWith("\\"));
+                finalLine = sb1.toString();
+            } else {
+                finalLine = line;
+            }
+
+            var results = parser.apply(finalLine);
+            StringBuilder sb2 = new StringBuilder();
             Optional<ParsedArgument<CommandSourceStack, ?>> optional;
             while ((optional = getComponentArg(results)).isPresent()) {
                 var arg = optional.get();
-                var translatable = Utils.literal2Translatable((Component) arg.getResult());
                 StringRange range = arg.getRange();
-                sb.append(line, 0, range.getStart())
-                        .append(Utils.component2String(translatable))
+                sb2.append(line, 0, range.getStart())
+                        .append(Utils.translatable2String((Component) arg.getResult()))
                         .append(line.substring(range.getEnd()));
-                line = sb.toString();
+                line = sb2.toString();
                 results = parser.apply(line);
             }
             modified.add(line);
         }
-        return modified;
+        return String.join("", modified);
     }
 
     private static Optional<ParsedArgument<CommandSourceStack, ?>> getComponentArg(ParseResults<CommandSourceStack> results) {
         return results.getContext().getArguments().values().stream()
-                .filter(WorldExtractor::argNeedReplace)
+                .filter(arg -> arg.getResult() instanceof Component c && c.getContents().type() == PlainTextContents.TYPE)
                 .findFirst();
-    }
-
-    private static boolean argNeedReplace(ParsedArgument<?, ?> arg) {
-        return arg.getResult() instanceof Component c && c.getContents().type() == PlainTextContents.TYPE;
     }
 
     private static boolean lineNeedReplace(String line) {
@@ -156,13 +217,9 @@ public class WorldExtractor extends WorldUpgrader {
                 line.startsWith("title");
     }
 
-    public static void extractAdvancements(ServerAdvancementManager manager) {
-        for (AdvancementHolder advancement : manager.getAllAdvancements()) {
-            DisplayInfo display = advancement.value().display().orElse(null);
-            if (display == null) continue;
-            Utils.literal2Translatable(display.getDescription());
-            Utils.literal2Translatable(display.getTitle());
-        }
+    public static CompoundTag processStructure(ResourceLocation rl, StructureTemplateManager manager) {
+        StructureTemplate structure = manager.get(STRUCTURE_CONVERTOR.fileToId(rl)).orElse(null);
+        return new StructureTemplateWHandler().handle(structure);
     }
 
     public static void extractBossBar(LevelStorageSource.LevelStorageAccess levelStorage, RegistryAccess registry, WorldData worldData) {
@@ -177,31 +234,6 @@ public class WorldExtractor extends WorldUpgrader {
         CustomScoreBoard sb = new CustomScoreBoard();
         dataStorage.get(sb.dataFactory(), "scoreboard");
         sb.extract();
-    }
-
-    public static final class CustomScoreBoard extends Scoreboard {
-        public SavedData.Factory<ScoreboardSaveData> dataFactory() {
-            return new SavedData.Factory<>(this::createData, this::createData, DataFixTypes.SAVED_DATA_SCOREBOARD);
-        }
-
-        private ScoreboardSaveData createData() {
-            return new ScoreboardSaveData(this);
-        }
-
-        private ScoreboardSaveData createData(CompoundTag tag, HolderLookup.Provider registries) {
-            return this.createData().load(tag, registries);
-        }
-
-        public void extract() {
-            this.getPlayerTeams().forEach(t -> {
-                t.setDisplayName(Utils.literal2Translatable(t.getDisplayName()));
-                t.setPlayerPrefix(Utils.literal2Translatable(t.getPlayerPrefix()));
-                t.setPlayerSuffix(Utils.literal2Translatable(t.getPlayerSuffix()));
-            });
-            this.getObjectives().forEach(o ->
-                o.setDisplayName(Utils.literal2Translatable(o.getDisplayName()))
-            );
-        }
     }
 
     class ChunkExtractor extends WorldUpgrader.AbstractUpgrader<ChunkStorage> {
