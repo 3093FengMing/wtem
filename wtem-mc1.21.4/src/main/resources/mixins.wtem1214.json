@@ -3,7 +3,6 @@
   "compatibilityLevel": "JAVA_8",
   "package": "me.fengming.wtem.mc1214.mixin",
   "mixins": [
-    "MixinServerFunctionLibrary",
     "MixinStructureTemplateManager",
     "MixinWorldUpgrader"
   ],

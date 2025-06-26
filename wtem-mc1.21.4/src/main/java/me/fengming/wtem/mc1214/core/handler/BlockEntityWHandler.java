@@ -1,6 +1,7 @@
 package me.fengming.wtem.mc1214.core.handler;
 
 import me.fengming.wtem.mc1214.core.Utils;
+import me.fengming.wtem.mc1214.core.WorldExtractor;
 import me.fengming.wtem.mc1214.core.visitor.EntityTagVisitor;
 import me.fengming.wtem.mc1214.core.visitor.ItemTagVisitor;
 import me.fengming.wtem.mc1214.core.visitor.SimpleTagVisitor;
@@ -69,6 +70,10 @@ public class BlockEntityWHandler extends AbstractWHandler<CompoundTag> {
                         Utils.getCompound(potentials.getCompound(i), "data.entity").accept(entityVisitor);
                     }
                 }
+            };
+            case "command_block" -> (SimpleTagVisitor) tag -> {
+                String command = WorldExtractor.processFunction(List.of(tag.getString("Command")));
+                tag.putString("Command", command);
             };
             default -> SimpleTagVisitor.INSTANCE;
         };

@@ -12,16 +12,17 @@ import me.fengming.wtem.mc1214.core.handler.BlockEntityWHandler;
 import me.fengming.wtem.mc1214.core.handler.EntityWHandler;
 import me.fengming.wtem.mc1214.core.handler.StructureTemplateWHandler;
 import me.fengming.wtem.mc1214.core.misc.CustomScoreBoard;
-import me.fengming.wtem.mc1214.mixin.MixinServerFunctionLibrary;
 import me.fengming.wtem.mc1214.mixin.MixinStructureTemplateManager;
 import me.fengming.wtem.mc1214.mixin.MixinWorldUpgrader;
 import net.minecraft.FileUtil;
 import net.minecraft.client.Minecraft;
 import net.minecraft.commands.CommandSource;
 import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.Commands;
 import net.minecraft.core.HolderGetter;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.data.registries.VanillaRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
@@ -31,7 +32,6 @@ import net.minecraft.network.chat.contents.PlainTextContents;
 import net.minecraft.resources.FileToIdConverter;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.server.ReloadableServerResources;
 import net.minecraft.server.WorldStem;
 import net.minecraft.server.packs.PackResources;
 import net.minecraft.server.packs.PackType;
@@ -73,7 +73,6 @@ import java.util.function.Function;
 public class WorldExtractor extends WorldUpgrader {
     public static final Gson GSON = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
     public static final FileToIdConverter STRUCTURE_CONVERTOR = new FileToIdConverter("structure", ".nbt");
-    public static final CommandSourceStack EMPTY_SOURCE = new CommandSourceStack(CommandSource.NULL, Vec3.ZERO, Vec2.ZERO, null, 3, "", CommonComponents.EMPTY, null, null);
 
     public static final Component STATUS_EXTRACTING = Component.translatable("gui.wtem.main.extraction.working");
     public static final Component STATUS_FINISHED_EXTRACTION = Component.translatable("gui.wtem.main.extraction.finished");
@@ -109,7 +108,7 @@ public class WorldExtractor extends WorldUpgrader {
         new EntityExtractor().upgrade();
         extractScoreBoard(thiz.getOverworldDataStorage());
         extractBossBar(this.levelStorage, this.registry, this.worldStem.worldData());
-        extractDatapacks(datapack, this.worldStem.resourceManager(), this.levelStorage, this.structureManager);
+        extractDatapacks(this.worldStem.resourceManager(), this.levelStorage, this.structureManager);
         extractStructures(this.structureManager);
         thiz.setFinished(true);
     }
@@ -120,17 +119,17 @@ public class WorldExtractor extends WorldUpgrader {
             var optional = manager.get(rl);
             if (optional.isEmpty()) return;
             CompoundTag modified = new StructureTemplateWHandler().handle(optional.get());
-            Path filePath = FileUtil.createPathToResource(managerMixin.getGeneratedDir().resolve(rl.getNamespace()).resolve("structures"), rl.getPath(), ".nbt");
+            Path filePath = FileUtil.createPathToResource(
+                    managerMixin.getGeneratedDir().resolve(rl.getNamespace()).resolve("structures"),
+                    rl.getPath(), ".nbt"
+            );
             Utils.writeNbt(filePath, modified);
         });
     }
 
-    public static void extractDatapacks(ReloadableServerResources datapacks,
-                                        ResourceManager resourceManager,
+    public static void extractDatapacks(ResourceManager resourceManager,
                                         LevelStorageSource.LevelStorageAccess levelStorage,
                                         StructureTemplateManager structureManager) {
-        final Function<String, ParseResults<CommandSourceStack>> parser =
-                line -> ((MixinServerFunctionLibrary) datapacks.getFunctionLibrary()).getDispatcher().parse(line, EMPTY_SOURCE);
         final var datapackDir = levelStorage.getLevelPath(LevelResource.DATAPACK_DIR);
 
         for (PackResources pack : resourceManager.listPacks().toList()) {
@@ -147,7 +146,13 @@ public class WorldExtractor extends WorldUpgrader {
                         Utils.writeNbt(filePath.apply(rl), modified);
                     });
                     pack.listResources(PackType.SERVER_DATA, namespace, "function", (rl, supplier) -> {
-                        String modified = processFunction(supplier, parser);
+                        List<String> lines;
+                        try (BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(supplier.get(), StandardCharsets.UTF_8))) {
+                            lines = bufferedReader.lines().toList();
+                        } catch (IOException e) {
+                            throw new IllegalStateException(e);
+                        }
+                        String modified = processFunction(lines);
                         Utils.writeLines(filePath.apply(rl), modified);
                     });
                     pack.listResources(PackType.SERVER_DATA, namespace, "advancement", (rl, supplier) -> {
@@ -179,20 +184,23 @@ public class WorldExtractor extends WorldUpgrader {
         return jsonString;
     }
 
-    public static String processFunction(IoSupplier<InputStream> supplier, Function<String, ParseResults<CommandSourceStack>> parser) {
-        List<String> lines;
-        try (BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(supplier.get(), StandardCharsets.UTF_8))) {
-            lines = bufferedReader.lines().toList();
-        } catch (IOException e) {
-            return "";
-        }
+    public static String processFunction(List<String> lines) {
+        final Function<String, ParseResults<CommandSourceStack>> parser =
+                line -> new Commands(
+                        Commands.CommandSelection.ALL,
+                        Commands.createValidationContext(VanillaRegistries.createLookup())
+                ).getDispatcher().parse(line, new CommandSourceStack(
+                        CommandSource.NULL, Vec3.ZERO, Vec2.ZERO,
+                        null, 3, "WTEM",
+                        CommonComponents.EMPTY, null, null)
+                );
 
         List<String> modified = new ArrayList<>();
         for (int i = 0, size = lines.size(); i < size; i++) {
             String line = lines.get(i).trim();
             if (!lineNeedReplace(line)) continue;
 
-            String finalLine;
+            String finalLine = line;
             if (line.endsWith("\\")) {
                 StringBuilder sb1 = new StringBuilder(line);
                 do {
@@ -201,8 +209,6 @@ public class WorldExtractor extends WorldUpgrader {
                     sb1.append(lines.get(i).trim());
                 } while (sb1.toString().endsWith("\\"));
                 finalLine = sb1.toString();
-            } else {
-                finalLine = line;
             }
 
             var results = parser.apply(finalLine);
