@@ -1,8 +1,6 @@
 package me.fengming.wtem.mc1214.core;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.JsonParser;
+import com.google.gson.*;
 import com.mojang.brigadier.ParseResults;
 import com.mojang.brigadier.context.ParsedArgument;
 import com.mojang.brigadier.context.StringRange;
@@ -102,7 +100,6 @@ public class WorldExtractor extends WorldUpgrader {
     @Override
     public void work() {
         var thiz = (MixinWorldUpgrader) this;
-        var datapack = this.worldStem.dataPackResources();
 
         new ChunkExtractor().upgrade();
         new EntityExtractor().upgrade();
@@ -155,6 +152,15 @@ public class WorldExtractor extends WorldUpgrader {
                         String modified = processFunction(lines);
                         Utils.writeLines(filePath.apply(rl), modified);
                     });
+                    pack.listResources(PackType.SERVER_DATA, namespace, "predicate", (rl, supplier) -> {
+                        Utils.writeLines(filePath.apply(rl), processPredicate(supplier));
+                    });
+                    pack.listResources(PackType.SERVER_DATA, namespace, "item_modifier", (rl, supplier) -> {
+                        Utils.writeLines(filePath.apply(rl), processItemModifier(supplier));
+                    });
+                    pack.listResources(PackType.SERVER_DATA, namespace, "loot_table", (rl, supplier) -> {
+                        Utils.writeLines(filePath.apply(rl), processLootTable(supplier));
+                    });
                     pack.listResources(PackType.SERVER_DATA, namespace, "advancement", (rl, supplier) -> {
                         String modified = processJsonFile(supplier, List.of("display.title", "display.description"));
                         Utils.writeLines(filePath.apply(rl), modified);
@@ -170,18 +176,82 @@ public class WorldExtractor extends WorldUpgrader {
         }
     }
 
-    public static String processJsonFile(IoSupplier<InputStream> supplier, List<String> list) {
-        String jsonString = "";
-        try (var br = new InputStreamReader(supplier.get(), StandardCharsets.UTF_8)) {
-            var jsonObj = JsonParser.parseReader(br).getAsJsonObject();
-            for (String s : list) {
-                Utils.handleJsonElement(jsonObj, s);
-            }
-            jsonString = GSON.toJson(jsonObj);
-        } catch (Exception e) {
-            Wtem.LOGGER.error("Failed to parse JSON", e);
+    public static String processPredicate(IoSupplier<InputStream> supplier) {
+        return "";
+    }
+
+    public static String processItemModifier(IoSupplier<InputStream> supplier) {
+        var jsonObj = Utils.getJson(supplier, "");
+        if (jsonObj.isJsonObject()) {
+            jsonObj = processItemModifier(jsonObj.getAsJsonObject());
+        } else if (jsonObj.isJsonArray()) {
+            jsonObj = processItemModifiers(jsonObj.getAsJsonArray());
         }
-        return jsonString;
+        return GSON.toJson(jsonObj);
+    }
+
+    public static String processLootTable(IoSupplier<InputStream> supplier) {
+        var array = new JsonArray();
+        var pools = Utils.getJson(supplier, "pools").getAsJsonArray();
+        for (JsonElement pool : pools) {
+            var array1 = new JsonArray();
+            var entries = pool.getAsJsonObject().getAsJsonArray("entries");
+            for (JsonElement entry : entries) {
+                array1.add(processLootEntry(entry.getAsJsonObject()));
+            }
+            pool.getAsJsonObject().add("entries", array1);
+            array.add(pool);
+        }
+        return GSON.toJson(array);
+    }
+
+    public static JsonObject processLootEntry(JsonObject entry) {
+        var entryObj = entry.getAsJsonObject();
+        String type = entryObj.get("type").getAsString();
+        switch (type) {
+            case "minecraft:item" -> {
+                var modifiers = entryObj.getAsJsonArray("functions");
+                entryObj.remove("functions");
+                entryObj.add("functions", processItemModifiers(modifiers));
+            }
+            case "minecraft:group" -> {
+                var array = new JsonArray();
+                var children = entryObj.getAsJsonArray("children");
+                for (JsonElement child : children) {
+                    array.add(processLootEntry(child.getAsJsonObject()));
+                }
+                entryObj.remove("children");
+                entryObj.add("children", array);
+            }
+            default -> {
+                return entryObj;
+            }
+        }
+        return entryObj;
+    }
+
+    public static JsonArray processItemModifiers(JsonArray modifiers) {
+        JsonArray array = new JsonArray();
+        for (JsonElement element : modifiers) {
+            array.add(processItemModifier(element.getAsJsonObject()));
+        }
+        return array;
+    }
+
+    public static JsonObject processItemModifier(JsonObject modifier) {
+        JsonObject object = modifier.getAsJsonObject();
+        String function = object.get("function").getAsString();
+        if ("set_lore".equals(function)) Utils.handleJsonElement(object, "lore");
+        if ("set_name".equals(function)) Utils.handleJsonElement(object, "name");
+        return modifier;
+    }
+
+    public static String processJsonFile(IoSupplier<InputStream> supplier, List<String> list) {
+        var jsonObj = Utils.getJson(supplier, "").getAsJsonObject();
+        for (String s : list) {
+            Utils.handleJsonElement(jsonObj, s);
+        }
+        return GSON.toJson(jsonObj);
     }
 
     public static String processFunction(List<String> lines) {

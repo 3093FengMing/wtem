@@ -1,6 +1,8 @@
 package me.fengming.wtem.mc1214.core;
 
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.mojang.serialization.JsonOps;
 import me.fengming.wtem.mc1214.Wtem;
 import net.minecraft.core.RegistryAccess;
@@ -13,8 +15,12 @@ import net.minecraft.network.chat.ComponentSerialization;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.contents.PlainTextContents;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.packs.resources.IoSupplier;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
@@ -75,6 +81,25 @@ public class Utils {
         var translatable = literal2Translatable(Component.Serializer.fromJson(element.get(path), RegistryAccess.EMPTY));
         element.remove(path);
         element.add(path, ComponentSerialization.CODEC.encodeStart(JsonOps.INSTANCE, translatable).getOrThrow());
+    }
+
+    public static JsonElement getJson(IoSupplier<InputStream> supplier, String path) {
+        String[] paths = path.split("\\.");
+        if (paths.length == 0) return new JsonObject();
+        try (var br = new InputStreamReader(supplier.get(), StandardCharsets.UTF_8)) {
+            JsonObject json = JsonParser.parseReader(br).getAsJsonObject();
+            JsonElement element = json;
+            if (path.isEmpty()) return element;
+            for (String s : paths) {
+                path = s;
+                if (!json.has(path)) break;
+                element = json.get(path);
+            }
+            return element;
+        } catch (Exception e) {
+            Wtem.LOGGER.error("Failed to parse JSON", e);
+        }
+        return new JsonObject();
     }
 
     public static CompoundTag getCompound(CompoundTag compound, String path) {
