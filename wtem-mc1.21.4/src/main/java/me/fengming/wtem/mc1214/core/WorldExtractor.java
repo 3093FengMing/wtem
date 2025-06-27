@@ -143,14 +143,7 @@ public class WorldExtractor extends WorldUpgrader {
                         Utils.writeNbt(filePath.apply(rl), modified);
                     });
                     pack.listResources(PackType.SERVER_DATA, namespace, "function", (rl, supplier) -> {
-                        List<String> lines;
-                        try (BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(supplier.get(), StandardCharsets.UTF_8))) {
-                            lines = bufferedReader.lines().toList();
-                        } catch (IOException e) {
-                            throw new IllegalStateException(e);
-                        }
-                        String modified = processFunction(lines);
-                        Utils.writeLines(filePath.apply(rl), modified);
+                        Utils.writeLines(filePath.apply(rl), processFunction(supplier));
                     });
                     pack.listResources(PackType.SERVER_DATA, namespace, "predicate", (rl, supplier) -> {
                         Utils.writeLines(filePath.apply(rl), processPredicate(supplier));
@@ -176,11 +169,21 @@ public class WorldExtractor extends WorldUpgrader {
         }
     }
 
-    public static String processPredicate(IoSupplier<InputStream> supplier) {
+    private static String processFunction(IoSupplier<InputStream> supplier) {
+        List<String> lines;
+        try (BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(supplier.get(), StandardCharsets.UTF_8))) {
+            lines = bufferedReader.lines().toList();
+        } catch (IOException e) {
+            throw new IllegalStateException(e);
+        }
+        return processFunction(lines);
+    }
+
+    private static String processPredicate(IoSupplier<InputStream> supplier) {
         return "";
     }
 
-    public static String processItemModifier(IoSupplier<InputStream> supplier) {
+    private static String processItemModifier(IoSupplier<InputStream> supplier) {
         var jsonObj = Utils.getJson(supplier, "");
         if (jsonObj.isJsonObject()) {
             jsonObj = processItemModifier(jsonObj.getAsJsonObject());
@@ -190,7 +193,7 @@ public class WorldExtractor extends WorldUpgrader {
         return GSON.toJson(jsonObj);
     }
 
-    public static String processLootTable(IoSupplier<InputStream> supplier) {
+    private static String processLootTable(IoSupplier<InputStream> supplier) {
         var array = new JsonArray();
         var pools = Utils.getJson(supplier, "pools").getAsJsonArray();
         for (JsonElement pool : pools) {
@@ -203,6 +206,14 @@ public class WorldExtractor extends WorldUpgrader {
             array.add(pool);
         }
         return GSON.toJson(array);
+    }
+
+    private static String processJsonFile(IoSupplier<InputStream> supplier, List<String> list) {
+        var jsonObj = Utils.getJson(supplier, "").getAsJsonObject();
+        for (String s : list) {
+            Utils.handleJsonElement(jsonObj, s);
+        }
+        return GSON.toJson(jsonObj);
     }
 
     public static JsonObject processLootEntry(JsonObject entry) {
@@ -244,14 +255,6 @@ public class WorldExtractor extends WorldUpgrader {
         if ("set_lore".equals(function)) Utils.handleJsonElement(object, "lore");
         if ("set_name".equals(function)) Utils.handleJsonElement(object, "name");
         return modifier;
-    }
-
-    public static String processJsonFile(IoSupplier<InputStream> supplier, List<String> list) {
-        var jsonObj = Utils.getJson(supplier, "").getAsJsonObject();
-        for (String s : list) {
-            Utils.handleJsonElement(jsonObj, s);
-        }
-        return GSON.toJson(jsonObj);
     }
 
     public static String processFunction(List<String> lines) {
