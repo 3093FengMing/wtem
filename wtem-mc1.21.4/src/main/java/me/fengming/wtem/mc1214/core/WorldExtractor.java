@@ -10,6 +10,7 @@ import me.fengming.wtem.mc1214.core.handler.BlockEntityWHandler;
 import me.fengming.wtem.mc1214.core.handler.EntityWHandler;
 import me.fengming.wtem.mc1214.core.handler.StructureTemplateWHandler;
 import me.fengming.wtem.mc1214.core.misc.CustomScoreBoard;
+import me.fengming.wtem.mc1214.core.visitor.ItemTagVisitor;
 import me.fengming.wtem.mc1214.mixin.MixinStructureTemplateManager;
 import me.fengming.wtem.mc1214.mixin.MixinWorldUpgrader;
 import net.minecraft.FileUtil;
@@ -169,28 +170,24 @@ public class WorldExtractor extends WorldUpgrader {
         }
     }
 
-    private static String processFunction(IoSupplier<InputStream> supplier) {
-        List<String> lines;
-        try (BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(supplier.get(), StandardCharsets.UTF_8))) {
-            lines = bufferedReader.lines().toList();
-        } catch (IOException e) {
-            throw new IllegalStateException(e);
-        }
-        return processFunction(lines);
-    }
-
     private static String processPredicate(IoSupplier<InputStream> supplier) {
-        return "";
+        var json = Utils.getJson(supplier, "");
+        if (json.isJsonObject()) {
+            json = processPredicate(json.getAsJsonObject());
+        } else if (json.isJsonArray()) {
+            json = processPredicates(json.getAsJsonArray());
+        }
+        return GSON.toJson(json);
     }
 
     private static String processItemModifier(IoSupplier<InputStream> supplier) {
-        var jsonObj = Utils.getJson(supplier, "");
-        if (jsonObj.isJsonObject()) {
-            jsonObj = processItemModifier(jsonObj.getAsJsonObject());
-        } else if (jsonObj.isJsonArray()) {
-            jsonObj = processItemModifiers(jsonObj.getAsJsonArray());
+        var json = Utils.getJson(supplier, "");
+        if (json.isJsonObject()) {
+            json = processItemModifier(json.getAsJsonObject());
+        } else if (json.isJsonArray()) {
+            json = processItemModifiers(json.getAsJsonArray());
         }
-        return GSON.toJson(jsonObj);
+        return GSON.toJson(json);
     }
 
     private static String processLootTable(IoSupplier<InputStream> supplier) {
@@ -208,12 +205,53 @@ public class WorldExtractor extends WorldUpgrader {
         return GSON.toJson(array);
     }
 
+    private static String processFunction(IoSupplier<InputStream> supplier) {
+        List<String> lines;
+        try (BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(supplier.get(), StandardCharsets.UTF_8))) {
+            lines = bufferedReader.lines().toList();
+        } catch (IOException e) {
+            throw new IllegalStateException(e);
+        }
+        return processFunction(lines);
+    }
+
     private static String processJsonFile(IoSupplier<InputStream> supplier, List<String> list) {
         var jsonObj = Utils.getJson(supplier, "").getAsJsonObject();
         for (String s : list) {
             Utils.handleJsonElement(jsonObj, s);
         }
         return GSON.toJson(jsonObj);
+    }
+
+    public static JsonObject processPredicate(JsonObject predicate) {
+        String condition = predicate.get("condition").getAsString();
+        switch (condition) {
+            case "all_of", "any_of" -> {
+                var array = processPredicates(predicate.getAsJsonArray("terms"));
+                predicate.remove("terms");
+                predicate.add("terms", array);
+            }
+            case "inverted" -> {
+                var object = predicate.getAsJsonObject("term");
+                predicate.remove("term");
+                predicate.add("term", object);
+            }
+            case "match_tool" -> {
+                var components = predicate.getAsJsonObject("predicate").getAsJsonObject("components");
+                var compound = Utils.json2Compound(components);
+                compound.accept(new ItemTagVisitor());
+                predicate.getAsJsonObject("predicate").add("components", Utils.compound2Json(compound));
+            }
+        }
+        return predicate;
+    }
+
+    public static JsonArray processPredicates(JsonArray predicates) {
+        var array = new JsonArray();
+        for (JsonElement predicate : predicates) {
+            array.add(processPredicate(predicate.getAsJsonObject()));
+        }
+        return array;
     }
 
     public static JsonObject processLootEntry(JsonObject entry) {
@@ -250,10 +288,9 @@ public class WorldExtractor extends WorldUpgrader {
     }
 
     public static JsonObject processItemModifier(JsonObject modifier) {
-        JsonObject object = modifier.getAsJsonObject();
-        String function = object.get("function").getAsString();
-        if ("set_lore".equals(function)) Utils.handleJsonElement(object, "lore");
-        if ("set_name".equals(function)) Utils.handleJsonElement(object, "name");
+        String function = modifier.get("function").getAsString();
+        if ("set_lore".equals(function)) Utils.handleJsonElement(modifier, "lore");
+        if ("set_name".equals(function)) Utils.handleJsonElement(modifier, "name");
         return modifier;
     }
 

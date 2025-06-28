@@ -114,6 +114,23 @@ public class Utils {
         return tag.getCompound(path);
     }
 
+    public static CompoundTag json2Compound(JsonObject json) {
+        var optional = CompoundTag.CODEC.parse(JsonOps.INSTANCE, json).result();
+        if (optional.isEmpty()) {
+            Wtem.LOGGER.warn("Couldn't parse JSON to a compound tag: {}", json);
+            return new CompoundTag();
+        }
+        return optional.get();
+    }
+    public static JsonObject compound2Json(CompoundTag compound) {
+        var optional = CompoundTag.CODEC.encodeStart(JsonOps.INSTANCE, compound).result();
+        if (optional.isEmpty()) {
+            Wtem.LOGGER.warn("Couldn't parse a compound tag to JSON: {}", compound);
+            return new JsonObject();
+        }
+        return optional.get().getAsJsonObject();
+    }
+
     public static void writeLines(Path path, String lines) {
         try {
             if (Files.notExists(path)) {
