@@ -18,7 +18,7 @@ import java.util.function.Function;
 public class PredicateHandler extends NonExtraResourceHandler {
     public static final HandlerFactory FACTORY = PredicateHandler::new;
 
-    public PredicateHandler(Function<ResourceLocation, Path> filePath, Object object) {
+    public PredicateHandler(Function<ResourceLocation, Path> filePath, Context context) {
         super("predicate", filePath);
     }
 

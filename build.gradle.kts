@@ -61,8 +61,14 @@ subprojects {
         }
     }
 
+    sourceSets {
+        main {
+            runtimeClasspath += rootProject.sourceSets.main.get().output
+        }
+    }
+
     dependencies {
-        implementation(project(":")) {
+        compileOnly(project(":")) {
             exclude(group = "net.fabricmc", module = "fabric-loader") // prevent duplicate fabric-loader on run
         }
     }

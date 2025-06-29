@@ -1,5 +1,5 @@
 {
-  "gui.wtem.extract": "Translate",
+  "gui.wtem.extract": "Extract",
   "gui.wtem.main.warn": "Warning!",
   "gui.wtem.main.extraction.working": "Extracting...",
   "gui.wtem.main.extraction.finished": "Finished extracting",
