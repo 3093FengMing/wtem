@@ -1,7 +1,7 @@
-package me.fengming.wtem.mc1214.mixin;
+package me.fengming.wtem.common.mixin;
 
 import it.unimi.dsi.fastutil.booleans.BooleanConsumer;
-import me.fengming.wtem.mc1214.gui.WtemScreen;
+import me.fengming.wtem.common.gui.WtemScreen;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.layouts.LinearLayout;
 import net.minecraft.client.gui.screens.BackupConfirmScreen;
@@ -24,7 +24,7 @@ import static net.minecraft.client.gui.screens.worldselection.EditWorldScreen.ma
  * @author FengMing
  */
 @Mixin(EditWorldScreen.class)
-public class MixinEditWorldScreen extends Screen {
+public abstract class MixinEditWorldScreen extends Screen {
     @Shadow @Final private LinearLayout layout;
     @Shadow @Final private LevelStorageSource.LevelStorageAccess levelAccess;
     @Shadow @Final private BooleanConsumer callback;
@@ -38,6 +38,7 @@ public class MixinEditWorldScreen extends Screen {
 
     @Inject(method = "<init>", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/layouts/LinearLayout;visitWidgets(Ljava/util/function/Consumer;)V", shift = At.Shift.BEFORE))
     private void onInit(CallbackInfo ci) {
+        if (minecraft == null) return;
         this.layout.addChild(Button.builder(
                         WTEM_EXTRACT, button -> minecraft.setScreen(new BackupConfirmScreen(() -> minecraft.setScreen(this), (isConfirm, isCancel) -> {
                     if (isConfirm) makeBackupAndShowToast(levelAccess);

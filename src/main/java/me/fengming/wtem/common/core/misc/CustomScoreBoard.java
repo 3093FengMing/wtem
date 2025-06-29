@@ -1,6 +1,6 @@
-package me.fengming.wtem.mc1214.core.misc;
+package me.fengming.wtem.common.core.misc;
 
-import me.fengming.wtem.mc1214.core.Utils;
+import me.fengming.wtem.common.core.Utils;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.util.datafix.DataFixTypes;

@@ -7,7 +7,7 @@ dependencies {
 }
 
 loom {
-    accessWidenerPath = file("src/main/resources/wtem-1.21.4.accesswidener")
+
 }
 
 tasks.compileJava {

@@ -1,6 +1,6 @@
-package me.fengming.wtem.mc1214.core.handler;
+package me.fengming.wtem.common.core.handler;
 
-import me.fengming.wtem.mc1214.core.visitor.EntityTagVisitor;
+import me.fengming.wtem.common.core.visitor.EntityTagVisitor;
 import net.minecraft.nbt.CompoundTag;
 
 /**

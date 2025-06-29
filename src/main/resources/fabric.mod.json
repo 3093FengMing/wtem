@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "wtem",
-  "version": "${version}",
+  "version": "${mod_version}",
   "name": "WTEM",
   "description": "",
   "authors": [],
@@ -9,11 +9,15 @@
   "license": "GPL-3.0",
   "icon": "assets/wtem/icon.png",
   "environment": "*",
+  "accessWidener": "wtem.accesswidener",
   "entrypoints": {
     "main": [
       "me.fengming.wtem.common.Wtem"
     ]
   },
+  "mixins": [
+    "mixins.wtem.json"
+  ],
   "depends": {
     "minecraft": [
       "1.21.4",

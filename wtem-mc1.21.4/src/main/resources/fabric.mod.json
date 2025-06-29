@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "wtem-mc1214",
-  "version": "${version}",
+  "version": "${mod_version}",
   "name": "WTEM for 1.21.4",
   "description": "",
   "authors": [],
@@ -9,7 +9,6 @@
   "license": "GPL-3.0",
   "icon": "assets/wtem/icon.png",
   "environment": "*",
-  "accessWidener": "wtem-1.21.4.accesswidener",
   "entrypoints": {
     "main": [
       "me.fengming.wtem.mc1214.Wtem"

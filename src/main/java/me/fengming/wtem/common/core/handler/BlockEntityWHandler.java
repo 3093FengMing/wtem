@@ -1,10 +1,10 @@
-package me.fengming.wtem.mc1214.core.handler;
+package me.fengming.wtem.common.core.handler;
 
-import me.fengming.wtem.mc1214.core.Utils;
-import me.fengming.wtem.mc1214.core.WorldExtractor;
-import me.fengming.wtem.mc1214.core.visitor.EntityTagVisitor;
-import me.fengming.wtem.mc1214.core.visitor.ItemTagVisitor;
-import me.fengming.wtem.mc1214.core.visitor.SimpleTagVisitor;
+import me.fengming.wtem.common.core.Utils;
+import me.fengming.wtem.common.core.datapack.FunctionHandler;
+import me.fengming.wtem.common.core.visitor.EntityTagVisitor;
+import me.fengming.wtem.common.core.visitor.SimpleTagVisitor;
+import me.fengming.wtem.common.core.visitor.ItemTagVisitor;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
@@ -72,7 +72,7 @@ public class BlockEntityWHandler extends AbstractWHandler<CompoundTag> {
                 }
             };
             case "command_block" -> (SimpleTagVisitor) tag -> {
-                String command = WorldExtractor.processFunction(List.of(tag.getString("Command")));
+                String command = FunctionHandler.processFunction(List.of(tag.getString("Command")));
                 tag.putString("Command", command);
             };
             default -> SimpleTagVisitor.INSTANCE;

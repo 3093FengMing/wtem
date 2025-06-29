@@ -1,10 +1,10 @@
-package me.fengming.wtem.mc1214.core;
+package me.fengming.wtem.common.core;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.mojang.serialization.JsonOps;
-import me.fengming.wtem.mc1214.Wtem;
+import me.fengming.wtem.common.Wtem;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;

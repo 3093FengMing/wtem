@@ -1,4 +1,4 @@
-package me.fengming.wtem.mc1214.mixin;
+package me.fengming.wtem.common.mixin;
 
 import net.minecraft.util.worldupdate.WorldUpgrader;
 import net.minecraft.world.level.storage.DimensionDataStorage;

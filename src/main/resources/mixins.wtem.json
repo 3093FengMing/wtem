@@ -1,0 +1,16 @@
+{
+  "required": true,
+  "compatibilityLevel": "JAVA_8",
+  "package": "me.fengming.wtem.common.mixin",
+  "mixins": [
+    "AccessorWorldUpgrader",
+    "MixinStructureTemplateManager",
+    "MixinWorldUpgrader"
+  ],
+  "client": [
+    "MixinEditWorldScreen"
+  ],
+  "injectors": {
+    "defaultRequire": 0
+  }
+}

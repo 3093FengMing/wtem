@@ -2,14 +2,8 @@
   "required": true,
   "compatibilityLevel": "JAVA_8",
   "package": "me.fengming.wtem.mc1214.mixin",
-  "mixins": [
-    "AccessorWorldUpgrader",
-    "MixinStructureTemplateManager",
-    "MixinWorldUpgrader"
-  ],
-  "client": [
-    "MixinEditWorldScreen"
-  ],
+  "mixins": [],
+  "client": [],
   "injectors": {
     "defaultRequire": 0
   }

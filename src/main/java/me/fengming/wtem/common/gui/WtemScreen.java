@@ -1,9 +1,9 @@
-package me.fengming.wtem.mc1214.gui;
+package me.fengming.wtem.common.gui;
 
 import com.mojang.datafixers.DataFixer;
 import it.unimi.dsi.fastutil.booleans.BooleanConsumer;
-import me.fengming.wtem.mc1214.Wtem;
-import me.fengming.wtem.mc1214.core.WorldExtractor;
+import me.fengming.wtem.common.Wtem;
+import me.fengming.wtem.common.core.WorldExtractor;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.Minecraft;
