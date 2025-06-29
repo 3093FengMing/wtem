@@ -12,7 +12,7 @@ import me.fengming.wtem.mc1214.core.handler.StructureTemplateWHandler;
 import me.fengming.wtem.mc1214.core.misc.CustomScoreBoard;
 import me.fengming.wtem.mc1214.core.visitor.ItemTagVisitor;
 import me.fengming.wtem.mc1214.mixin.MixinStructureTemplateManager;
-import me.fengming.wtem.mc1214.mixin.MixinWorldUpgrader;
+import me.fengming.wtem.mc1214.mixin.AccessorWorldUpgrader;
 import net.minecraft.FileUtil;
 import net.minecraft.client.Minecraft;
 import net.minecraft.commands.CommandSource;
@@ -98,9 +98,13 @@ public class WorldExtractor extends WorldUpgrader {
         this.structureManager = new StructureTemplateManager(this.worldStem.resourceManager(), levelStorage, dataFixer, holderGetter);
     }
 
+    public void startThread() {
+        ((AccessorWorldUpgrader) this).getThread().start();
+    }
+
     @Override
     public void work() {
-        var thiz = (MixinWorldUpgrader) this;
+        var thiz = (AccessorWorldUpgrader) this;
 
         new ChunkExtractor().upgrade();
         new EntityExtractor().upgrade();

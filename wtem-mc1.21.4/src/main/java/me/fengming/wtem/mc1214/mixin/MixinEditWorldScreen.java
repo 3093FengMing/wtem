@@ -29,7 +29,7 @@ public class MixinEditWorldScreen extends Screen {
     @Shadow @Final private LevelStorageSource.LevelStorageAccess levelAccess;
     @Shadow @Final private BooleanConsumer callback;
 
-    @Unique private static final Component WTEM_TRANSLATE = Component.translatable("gui.wtem.translate");
+    @Unique private static final Component WTEM_EXTRACT = Component.translatable("gui.wtem.extract");
     @Unique private static final Component WTEM_MAIN_WARN = Component.translatable("gui.wtem.main.warn");
 
     protected MixinEditWorldScreen(Component component) {
@@ -39,7 +39,7 @@ public class MixinEditWorldScreen extends Screen {
     @Inject(method = "<init>", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/layouts/LinearLayout;visitWidgets(Ljava/util/function/Consumer;)V", shift = At.Shift.BEFORE))
     private void onInit(CallbackInfo ci) {
         this.layout.addChild(Button.builder(
-                WTEM_TRANSLATE, button -> minecraft.setScreen(new BackupConfirmScreen(() -> minecraft.setScreen(this), (isConfirm, isCancel) -> {
+                        WTEM_EXTRACT, button -> minecraft.setScreen(new BackupConfirmScreen(() -> minecraft.setScreen(this), (isConfirm, isCancel) -> {
                     if (isConfirm) makeBackupAndShowToast(levelAccess);
                     minecraft.setScreen(WtemScreen.create(minecraft, this.callback, minecraft.getFixerUpper(), levelAccess));
                 }, WTEM_MAIN_WARN, WTEM_MAIN_WARN, CommonComponents.GUI_CONTINUE, false)))
