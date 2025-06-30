@@ -22,7 +22,7 @@ public class LootTableHandler extends NonExtraResourceHandler {
     }
 
     @Override
-    public void handle(ResourceLocation rl, IoSupplier<InputStream> supplier) {
+    protected void innerHandle(ResourceLocation rl, IoSupplier<InputStream> supplier) {
         var array = new JsonArray();
         var pools = Utils.getJson(supplier, "pools").getAsJsonArray();
         for (JsonElement pool : pools) {
@@ -54,9 +54,6 @@ public class LootTableHandler extends NonExtraResourceHandler {
                 }
                 entryObj.remove("children");
                 entryObj.add("children", array);
-            }
-            default -> {
-                return entryObj;
             }
         }
         return entryObj;

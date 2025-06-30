@@ -9,6 +9,11 @@ import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemp
  */
 public class StructureTemplateWHandler extends AbstractWHandler<CompoundTag> {
 
+    @Override
+    protected String getKey(CompoundTag tag) {
+        return "structure";
+    }
+
     public CompoundTag handle(StructureTemplate structure) {
         if (structure == null) return new CompoundTag();
         CompoundTag compound = structure.save(new CompoundTag());
@@ -17,7 +22,7 @@ public class StructureTemplateWHandler extends AbstractWHandler<CompoundTag> {
     }
 
     @Override
-    public boolean handle(CompoundTag tag) {
+    protected boolean innerHandle(CompoundTag tag) {
         BlockEntityWHandler beHandler = new BlockEntityWHandler();
         ListTag blocks = tag.getList("blocks", CompoundTag.TAG_COMPOUND);
         for (int i = 0; i < blocks.size(); i++) {

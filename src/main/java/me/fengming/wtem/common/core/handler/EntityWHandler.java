@@ -9,7 +9,12 @@ import net.minecraft.nbt.CompoundTag;
 public class EntityWHandler extends AbstractWHandler<CompoundTag> {
 
     @Override
-    public boolean handle(CompoundTag tag) {
+    protected String getKey(CompoundTag tag) {
+        return "entity." + tag.getString("id").split(":", 2)[1];
+    }
+
+    @Override
+    protected boolean innerHandle(CompoundTag tag) {
         tag.accept(new EntityTagVisitor());
         return true;
     }

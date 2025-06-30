@@ -39,7 +39,7 @@ public abstract class MixinEditWorldScreen extends Screen {
     @Inject(method = "<init>", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/layouts/LinearLayout;addChild(Lnet/minecraft/client/gui/layouts/LayoutElement;)Lnet/minecraft/client/gui/layouts/LayoutElement;", shift = At.Shift.AFTER, ordinal = 9))
     private void onInit(CallbackInfo ci) {
         this.layout.addChild(Button.builder(
-                        WTEM_EXTRACT, button -> minecraft.setScreen(new BackupConfirmScreen(() -> minecraft.setScreen(this), (isConfirm, isCancel) -> {
+                WTEM_EXTRACT, button -> minecraft.setScreen(new BackupConfirmScreen(() -> minecraft.setScreen(this), (isConfirm, isCancel) -> {
                     if (isConfirm) makeBackupAndShowToast(levelAccess);
                     minecraft.setScreen(WtemScreen.create(minecraft, this.callback, minecraft.getFixerUpper(), levelAccess));
                 }, WTEM_MAIN_WARN, WTEM_MAIN_WARN, CommonComponents.GUI_CONTINUE, false)))

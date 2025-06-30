@@ -38,7 +38,7 @@ public class FunctionHandler extends NonExtraResourceHandler {
     }
 
     @Override
-    public void handle(ResourceLocation rl, IoSupplier<InputStream> supplier) {
+    protected void innerHandle(ResourceLocation rl, IoSupplier<InputStream> supplier) {
         Utils.writeLines(getFilePath(rl), processFunction(supplier));
     }
 

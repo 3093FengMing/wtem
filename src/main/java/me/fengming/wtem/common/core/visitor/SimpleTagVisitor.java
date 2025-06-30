@@ -52,7 +52,7 @@ public interface SimpleTagVisitor extends TagVisitor {
     default void visitList(ListTag tag) {
         if (tag.isEmpty()) return;
         for (int i = 0; i < tag.size(); i++) {
-            tag.setTag(i, StringTag.valueOf(Utils.literal2Translatable(tag.getString(i))));
+            tag.setTag(i, StringTag.valueOf(Utils.literal2Translatable(tag.getString(i), false)));
         }
     }
 

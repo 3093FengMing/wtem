@@ -1,5 +1,6 @@
 package me.fengming.wtem.common.core.datapack;
 
+import me.fengming.wtem.common.core.TranslationContext;
 import me.fengming.wtem.common.core.Utils;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.IoSupplier;
@@ -18,15 +19,16 @@ public class SimpleJsonHandler extends ResourceHandler {
     }
 
     @Override
-    public void handle(ResourceLocation rl, IoSupplier<InputStream> supplier) {
+    protected void innerHandle(ResourceLocation rl, IoSupplier<InputStream> supplier) {
         Utils.writeLines(getFilePath(rl), processJsonFile(supplier, this.context.list()));
     }
 
-    protected static String processJsonFile(IoSupplier<InputStream> supplier, List<String> list) {
+    protected String processJsonFile(IoSupplier<InputStream> supplier, List<String> list) {
         if (list == null) return "";
         var jsonObj = Utils.getJson(supplier, "").getAsJsonObject();
         for (String s : list) {
             Utils.handleJsonElement(jsonObj, s);
+            TranslationContext.revert();
         }
         return GSON.toJson(jsonObj);
     }
@@ -36,6 +38,12 @@ public class SimpleJsonHandler extends ResourceHandler {
 
         public AdvancementHandlerSimple(Function<ResourceLocation, Path> filePath, Context context) {
             super("advancement", filePath, context.set(List.of("display.title", "display.description"), null));
+        }
+
+        @Override
+        protected String processJsonFile(IoSupplier<InputStream> supplier, List<String> list) {
+            var s = super.processJsonFile(supplier, list);
+            return s;
         }
     }
 

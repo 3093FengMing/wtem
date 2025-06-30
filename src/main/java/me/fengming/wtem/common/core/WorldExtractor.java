@@ -1,8 +1,8 @@
 package me.fengming.wtem.common.core;
 
 import com.mojang.datafixers.DataFixer;
-import me.fengming.wtem.common.core.datapack.ResourceHandler;
 import me.fengming.wtem.common.Wtem;
+import me.fengming.wtem.common.core.datapack.ResourceHandler;
 import me.fengming.wtem.common.core.datapack.ResourceHandlers;
 import me.fengming.wtem.common.core.handler.BlockEntityWHandler;
 import me.fengming.wtem.common.core.handler.EntityWHandler;
@@ -41,6 +41,7 @@ import net.minecraft.world.level.storage.LevelStorageSource;
 import net.minecraft.world.level.storage.WorldData;
 import org.jetbrains.annotations.NotNull;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.function.Function;
@@ -82,13 +83,26 @@ public class WorldExtractor extends WorldUpgrader {
     public void work() {
         var thiz = (AccessorWorldUpgrader) this;
 
+        TranslationContext.clear();
+
         new ChunkExtractor().upgrade();
         new EntityExtractor().upgrade();
         extractScoreBoard(thiz.getOverworldDataStorage());
         extractBossBar(this.levelStorage, this.registry, this.worldStem.worldData());
         extractDatapacks(this.worldStem.resourceManager(), this.levelStorage, this.structureManager);
         extractStructures(this.structureManager);
+
+        exportLanguage(this.levelStorage.getLevelPath(LevelResource.ROOT).resolve("en_us.json"));
+
         thiz.setFinished(true);
+    }
+
+    public static void exportLanguage(Path file) {
+        try {
+            Files.writeString(file, TranslationContext.exportLanguage());
+        } catch (IOException e) {
+            Wtem.LOGGER.error("Failed to export language file", e);
+        }
     }
 
     public static void extractStructures(StructureTemplateManager manager) {

@@ -2,6 +2,7 @@ package me.fengming.wtem.common.core.datapack;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import me.fengming.wtem.common.core.TranslationContext;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.IoSupplier;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager;
@@ -36,11 +37,17 @@ public abstract class ResourceHandler {
         return this.filePath.apply(rl);
     }
 
-    public abstract void handle(ResourceLocation rl, IoSupplier<InputStream> supplier);
+    public void handle(ResourceLocation rl, IoSupplier<InputStream> supplier) {
+        String p = rl.getPath().split("\\.", 2)[0];
+        String s = rl.getNamespace() + "." + p;
+        s = s.replace("/", ".");
+        TranslationContext.setKey("datapack." + s);
+        innerHandle(rl, supplier);
+    }
+
+    protected abstract void innerHandle(ResourceLocation rl, IoSupplier<InputStream> supplier);
 
     public record Context(@Nullable List<String> list, @Nullable StructureTemplateManager structureManager) {
-        public static final Context EMPTY = new Context(null, null);
-
         public static Context of(List<String> list, StructureTemplateManager structureManager) {
             return new Context(list, structureManager);
         }

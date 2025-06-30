@@ -23,7 +23,7 @@ public class PredicateHandler extends NonExtraResourceHandler {
     }
 
     @Override
-    public void handle(ResourceLocation rl, IoSupplier<InputStream> supplier) {
+    protected void innerHandle(ResourceLocation rl, IoSupplier<InputStream> supplier) {
         var json = Utils.getJson(supplier, "");
         if (json.isJsonObject()) {
             json = processPredicate(json.getAsJsonObject());

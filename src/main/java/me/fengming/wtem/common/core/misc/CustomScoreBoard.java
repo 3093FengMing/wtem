@@ -1,5 +1,6 @@
 package me.fengming.wtem.common.core.misc;
 
+import me.fengming.wtem.common.core.TranslationContext;
 import me.fengming.wtem.common.core.Utils;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
@@ -26,12 +27,14 @@ public class CustomScoreBoard extends Scoreboard {
 
     public void extract() {
         this.getPlayerTeams().forEach(t -> {
+            TranslationContext.setKey("score.team." + t.getName());
             t.setDisplayName(Utils.literal2Translatable(t.getDisplayName()));
             t.setPlayerPrefix(Utils.literal2Translatable(t.getPlayerPrefix()));
             t.setPlayerSuffix(Utils.literal2Translatable(t.getPlayerSuffix()));
         });
-        this.getObjectives().forEach(o ->
-                o.setDisplayName(Utils.literal2Translatable(o.getDisplayName()))
-        );
+        this.getObjectives().forEach(o -> {
+            TranslationContext.setKey("score.objective." + o.getName());
+            o.setDisplayName(Utils.literal2Translatable(o.getDisplayName()));
+        });
     }
 }

@@ -3,7 +3,9 @@ package me.fengming.wtem.common.core.datapack;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import me.fengming.wtem.common.core.TranslationContext;
 import me.fengming.wtem.common.core.Utils;
+import me.fengming.wtem.common.core.visitor.ItemTagVisitor;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.IoSupplier;
 
@@ -22,7 +24,7 @@ public class ItemModifierHandler extends NonExtraResourceHandler {
     }
 
     @Override
-    public void handle(ResourceLocation rl, IoSupplier<InputStream> supplier) {
+    protected void innerHandle(ResourceLocation rl, IoSupplier<InputStream> supplier) {
         var json = Utils.getJson(supplier, "");
         if (json.isJsonObject()) {
             json = processItemModifier(json.getAsJsonObject());
@@ -43,8 +45,36 @@ public class ItemModifierHandler extends NonExtraResourceHandler {
 
     public static JsonObject processItemModifier(JsonObject modifier) {
         String function = modifier.get("function").getAsString();
-        if ("set_lore".equals(function)) Utils.handleJsonElement(modifier, "lore");
-        if ("set_name".equals(function)) Utils.handleJsonElement(modifier, "name");
+        TranslationContext.revertAndAppend(Utils.getId(function));
+        switch (function) {
+            case "minecraft:set_lore" -> {
+                var lore = modifier.get("lore").getAsJsonArray();
+                var array = new JsonArray();
+                for (JsonElement element : lore) {
+                    array.add(Utils.literal2Translatable(element));
+                }
+                modifier.remove("lore");
+                modifier.add("lore", array);
+            }
+            case "minecraft:set_name" -> {
+                var json = modifier.get("name");
+                modifier.remove("name");
+                modifier.add("name", Utils.literal2Translatable(json));
+            }
+            case "minecraft:set_components" -> {
+                var compound = Utils.json2Compound(modifier.getAsJsonObject("components"));
+                compound.accept(new ItemTagVisitor());
+            }
+            case "minecraft:set_contents" -> {
+                var array = new JsonArray();
+                var entries = modifier.get("entries").getAsJsonArray();
+                for (JsonElement entry : entries) {
+                    array.add(LootTableHandler.processLootEntry(entry.getAsJsonObject()));
+                }
+                modifier.remove("entries");
+                modifier.add("entries", array);
+            }
+        }
         return modifier;
     }
 }

@@ -13,6 +13,7 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.ComponentSerialization;
 import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.Style;
 import net.minecraft.network.chat.contents.PlainTextContents;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.IoSupplier;
@@ -29,9 +30,10 @@ import java.nio.file.Path;
  */
 public class Utils {
 
-    public static String literal2Translatable(String literal) {
-        if (literal.isEmpty()) return literal;
+    public static String literal2Translatable(String literal, boolean nonItalic) {
+        if (literal.isBlank()) return literal;
         MutableComponent original = Component.Serializer.fromJsonLenient(literal, RegistryAccess.EMPTY);
+        if (original != null && nonItalic) original = original.withStyle(Style.EMPTY.withItalic(false));
         return Component.Serializer.toJson(literal2Translatable(original), RegistryAccess.EMPTY);
     }
 
@@ -39,9 +41,14 @@ public class Utils {
         if (original == null || original.getContents().type() != PlainTextContents.TYPE) return original;
 
         PlainTextContents plain = (PlainTextContents) original.getContents();
-        MutableComponent translatable = Component.translatable(plain.text());
+        MutableComponent translatable = Component.translatable(generateKey(plain.text()));
         translatable.setStyle(original.getStyle());
         return translatable;
+    }
+
+    public static JsonElement literal2Translatable(JsonElement json) {
+        var translatable = literal2Translatable(Component.Serializer.fromJson(json, RegistryAccess.EMPTY));
+        return ComponentSerialization.CODEC.encodeStart(JsonOps.INSTANCE, translatable).getOrThrow();
     }
 
     public static String translatable2String(Component component) {
@@ -49,13 +56,14 @@ public class Utils {
         return Component.Serializer.toJson(literal2Translatable(component), RegistryAccess.EMPTY);
     }
 
-    /**
-     * Handle StringTag in the incoming path of the incoming compound tag.
-     * Allow the use of '.' as a path separator.
-     * @param compound the compound tag
-     * @param path the path of string tag
-     */
+    public static String generateKey(String plain) {
+        String key = TranslationContext.nextKey();
+        TranslationContext.addKey(key, plain);
+        return key;
+    }
+
     public static void handleString(CompoundTag compound, String path) {
+        TranslationContext.append(getId(path));
         String[] paths = path.split("\\.");
         CompoundTag element = compound;
         for (String s : paths) {
@@ -66,10 +74,11 @@ public class Utils {
         String s = element.getString(path);
         if (s.isEmpty()) return;
         element.remove(path);
-        element.putString(path, literal2Translatable(s));
+        element.putString(path, literal2Translatable(s,false));
     }
 
     public static void handleJsonElement(JsonObject json, String path) {
+        TranslationContext.append(path);
         String[] paths = path.split("\\.");
         if (paths.length == 0) return;
         JsonObject element = json;
@@ -87,13 +96,14 @@ public class Utils {
         String[] paths = path.split("\\.");
         if (paths.length == 0) return new JsonObject();
         try (var br = new InputStreamReader(supplier.get(), StandardCharsets.UTF_8)) {
-            JsonObject json = JsonParser.parseReader(br).getAsJsonObject();
+            JsonElement json = JsonParser.parseReader(br);
             JsonElement element = json;
-            if (path.isEmpty()) return element;
+            if (!json.isJsonObject() || path.isEmpty()) return element;
+            json = json.getAsJsonObject();
             for (String s : paths) {
                 path = s;
-                if (!json.has(path)) break;
-                element = json.get(path);
+                if (!json.getAsJsonObject().has(path)) break;
+                element = json.getAsJsonObject().get(path);
             }
             return element;
         } catch (Exception e) {
@@ -122,6 +132,7 @@ public class Utils {
         }
         return optional.get();
     }
+
     public static JsonObject compound2Json(CompoundTag compound) {
         var optional = CompoundTag.CODEC.encodeStart(JsonOps.INSTANCE, compound).result();
         if (optional.isEmpty()) {
@@ -149,6 +160,12 @@ public class Utils {
         } catch (IOException e) {
             Wtem.LOGGER.error("Failed to write nbt to {}", path, e);
         }
+    }
+
+    public static String getId(String id) {
+        String[] sp = id.split(":", 2);
+        if (sp.length == 2) return sp[1];
+        return id;
     }
 
     public static void logInfo(String key, ResourceLocation world, ListTag pos) {

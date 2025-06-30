@@ -26,7 +26,7 @@ public class StructureHandler extends ResourceHandler {
     }
 
     @Override
-    public void handle(ResourceLocation rl, IoSupplier<InputStream> supplier) {
+    protected void innerHandle(ResourceLocation rl, IoSupplier<InputStream> supplier) {
         StructureTemplateManager m = this.context.structureManager();
         if (m == null) return;
         StructureTemplate structure = m.get(STRUCTURE_CONVERTOR.fileToId(rl)).orElse(null);

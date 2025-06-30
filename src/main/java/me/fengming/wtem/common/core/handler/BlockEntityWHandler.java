@@ -3,8 +3,8 @@ package me.fengming.wtem.common.core.handler;
 import me.fengming.wtem.common.core.Utils;
 import me.fengming.wtem.common.core.datapack.FunctionHandler;
 import me.fengming.wtem.common.core.visitor.EntityTagVisitor;
-import me.fengming.wtem.common.core.visitor.SimpleTagVisitor;
 import me.fengming.wtem.common.core.visitor.ItemTagVisitor;
+import me.fengming.wtem.common.core.visitor.SimpleTagVisitor;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
@@ -25,8 +25,13 @@ public class BlockEntityWHandler extends AbstractWHandler<CompoundTag> {
     };
 
     @Override
-    public boolean handle(CompoundTag compound) {
-        String id = compound.getString("id").split(":", 2)[1];
+    protected String getKey(CompoundTag tag) {
+        return "block." + Utils.getId(tag.getString("id"));
+    }
+
+    @Override
+    protected boolean innerHandle(CompoundTag compound) {
+        String id = Utils.getId(compound.getString("id"));
         compound.accept(getVisitor(id));
         return true;
     }
